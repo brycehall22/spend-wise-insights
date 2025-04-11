@@ -41,13 +41,6 @@ export default function BudgetProgress() {
                         ? "bg-amber-100" 
                         : "bg-green-100"
                   )}
-                  indicatorClassName={
-                    budget.remaining < 0 
-                      ? "bg-red-600" 
-                      : percentSpent > 90 
-                        ? "bg-amber-600" 
-                        : "bg-green-600"
-                  }
                 />
                 
                 {budget.remaining < 0 && (

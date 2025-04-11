@@ -35,7 +35,6 @@ export default function SavingsGoalsWidget() {
                 <Progress 
                   value={percentComplete} 
                   className="h-2 bg-gray-100" 
-                  indicatorClassName="bg-spendwise-orange" 
                 />
               </div>
               

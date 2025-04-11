@@ -59,15 +59,6 @@ export default function AppSidebar() {
 
   return (
     <>
-      {/* Mobile toggle button */}
-      <button
-        onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-40 bg-spendwise-oxford text-white p-2 rounded-md"
-        aria-label="Open menu"
-      >
-        <Menu size={24} />
-      </button>
-
       {/* Overlay for mobile */}
       {isMobileOpen && (
         <div
@@ -125,6 +116,15 @@ export default function AppSidebar() {
           </div>
         </div>
       </aside>
+
+      {/* Mobile toggle button - moved outside the sidebar */}
+      <button
+        onClick={() => setIsMobileOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-30 bg-spendwise-oxford text-white p-2 rounded-md shadow-md"
+        aria-label="Open menu"
+      >
+        <Menu size={24} />
+      </button>
 
       {/* Main content spacing */}
       <div className="lg:pl-64" />

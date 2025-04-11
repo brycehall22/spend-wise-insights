@@ -6,6 +6,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import Transactions from "./pages/Transactions";
+import Budgets from "./pages/Budgets";
+import Analytics from "./pages/Analytics";
+import Goals from "./pages/Goals";
+import Savings from "./pages/Savings";
+import Calendar from "./pages/Calendar";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -17,13 +24,13 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/transactions" element={<NotFound />} />
-          <Route path="/budgets" element={<NotFound />} />
-          <Route path="/analytics" element={<NotFound />} />
-          <Route path="/goals" element={<NotFound />} />
-          <Route path="/savings" element={<NotFound />} />
-          <Route path="/calendar" element={<NotFound />} />
-          <Route path="/settings" element={<NotFound />} />
+          <Route path="/transactions" element={<Transactions />} />
+          <Route path="/budgets" element={<Budgets />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/goals" element={<Goals />} />
+          <Route path="/savings" element={<Savings />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
