@@ -11,8 +11,6 @@ import { Card } from "@/components/ui/card";
 import { 
   ArrowDownUp, 
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Download,
   Filter,
   Plus,
@@ -35,14 +33,15 @@ import {
 } from "@/components/ui/pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { Transaction, Account, Category } from "@/types/database.types";
 
-interface Category {
+interface CategoryWithoutParent {
   category_id: string;
   name: string;
   parent_category_id: string | null;
 }
 
-interface Account {
+interface AccountSimple {
   account_id: string;
   account_name: string;
 }
@@ -58,103 +57,96 @@ export default function Transactions() {
   const [sortField, setSortField] = useState<string>("transaction_date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  // Fetch transactions data
+  // Mock transactions data for development
+  const [mockTransactions] = useState<TransactionType[]>([
+    {
+      transaction_id: "1",
+      account_id: "1",
+      account_name: "Chase Checking",
+      category_id: "101",
+      category_name: "Groceries",
+      amount: -45.67,
+      currency: "USD",
+      transaction_date: "2025-04-10",
+      description: "Weekly grocery shopping",
+      merchant: "Trader Joe's",
+      status: "cleared",
+      is_flagged: false
+    },
+    {
+      transaction_id: "2",
+      account_id: "1",
+      account_name: "Chase Checking",
+      category_id: "102",
+      category_name: "Restaurants",
+      amount: -28.50,
+      currency: "USD",
+      transaction_date: "2025-04-09",
+      description: "Dinner with friends",
+      merchant: "Olive Garden",
+      status: "cleared",
+      is_flagged: false
+    },
+    {
+      transaction_id: "3",
+      account_id: "2",
+      account_name: "Bank of America Savings",
+      category_id: "103",
+      category_name: "Salary",
+      amount: 1500.00,
+      currency: "USD",
+      transaction_date: "2025-04-05",
+      description: "Bi-weekly paycheck",
+      merchant: "Acme Corp",
+      status: "cleared",
+      is_flagged: false
+    }
+  ]);
+
+  // Mock categories and accounts data for development
+  const [mockCategories] = useState<CategoryWithoutParent[]>([
+    { category_id: "101", name: "Groceries", parent_category_id: null },
+    { category_id: "102", name: "Restaurants", parent_category_id: null },
+    { category_id: "103", name: "Salary", parent_category_id: null },
+    { category_id: "104", name: "Entertainment", parent_category_id: null },
+    { category_id: "105", name: "Transportation", parent_category_id: null },
+  ]);
+
+  const [mockAccounts] = useState<AccountSimple[]>([
+    { account_id: "1", account_name: "Chase Checking" },
+    { account_id: "2", account_name: "Bank of America Savings" },
+    { account_id: "3", account_name: "Amex Credit Card" },
+  ]);
+
+  // Fetch transactions data - temporarily using mock data
   const { data: transactionsData, isLoading: transactionsLoading, error: transactionsError, refetch: refetchTransactions } = useQuery({
     queryKey: ['transactions', filters, sortField, sortDirection, currentPage, pageSize],
     queryFn: async () => {
-      let query = supabase
-        .from('transactions')
-        .select(`
-          transaction_id,
-          account_id,
-          accounts:account_id (account_name),
-          category_id,
-          categories:category_id (name),
-          amount,
-          currency,
-          transaction_date,
-          description,
-          merchant,
-          status
-        `)
-        .order(sortField, { ascending: sortDirection === 'asc' })
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-
-      // Apply filters if they exist
-      if (filters) {
-        if (filters.search) {
-          query = query.or(`description.ilike.%${filters.search}%,merchant.ilike.%${filters.search}%`);
-        }
-        
-        if (filters.dateRange.from && filters.dateRange.to) {
-          query = query.gte('transaction_date', filters.dateRange.from.toISOString().split('T')[0])
-                       .lte('transaction_date', filters.dateRange.to.toISOString().split('T')[0]);
-        }
-        
-        if (filters.accounts.length > 0) {
-          query = query.in('account_id', filters.accounts);
-        }
-        
-        if (filters.categories.length > 0) {
-          query = query.in('category_id', filters.categories);
-        }
-        
-        if (filters.amountRange.min !== undefined) {
-          query = query.gte('amount', filters.amountRange.min);
-        }
-        
-        if (filters.amountRange.max !== undefined) {
-          query = query.lte('amount', filters.amountRange.max);
-        }
-        
-        if (filters.transactionType === 'income') {
-          query = query.gt('amount', 0);
-        } else if (filters.transactionType === 'expense') {
-          query = query.lt('amount', 0);
-        }
-        
-        if (filters.status !== 'all') {
-          query = query.eq('status', filters.status);
-        }
-      }
-
-      const { data, error } = await query;
-      
-      if (error) throw error;
-
-      return data.map(item => ({
-        ...item,
-        account_name: item.accounts?.account_name || 'Unknown Account',
-        category_name: item.categories?.name || null,
-        is_flagged: false // This would come from DB in real implementation
-      }));
+      // For development, return mock data instead of hitting the API
+      // In production, this would query the Supabase backend
+      console.log("Would fetch transactions with filters:", filters);
+      return mockTransactions;
     },
-    enabled: supabase !== undefined
+    enabled: true
   });
 
-  // Fetch categories and accounts data for filters and forms
-  const { data: categories = [] } = useQuery({
+  // Fetch categories and accounts - temporarily using mock data
+  const { data: categories = mockCategories } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('category_id, name, parent_category_id');
-      
-      if (error) throw error;
-      return data;
-    }
+      // For development, return mock data
+      return mockCategories;
+    },
+    enabled: true
   });
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = mockAccounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('account_id, account_name');
-      
-      if (error) throw error;
-      return data;
-    }
+      // For development, return mock data
+      return mockAccounts;
+    },
+    enabled: true
   });
 
   // Get active filter count
@@ -176,49 +168,13 @@ export default function Transactions() {
   // Handle transaction form submission
   const handleSaveTransaction = async (formData: TransactionFormValues) => {
     try {
-      if (formData.transaction_id) {
-        // Update existing transaction
-        const { error } = await supabase
-          .from('transactions')
-          .update({
-            account_id: formData.account_id,
-            category_id: formData.category_id || null,
-            amount: formData.amount,
-            transaction_date: formData.transaction_date.toISOString().split('T')[0],
-            description: formData.description || '',
-            merchant: formData.merchant,
-            status: formData.status,
-          })
-          .eq('transaction_id', formData.transaction_id);
-          
-        if (error) throw error;
-        
-        toast({
-          title: "Transaction updated",
-          description: "Your transaction has been updated successfully."
-        });
-      } else {
-        // Create new transaction
-        const { error } = await supabase
-          .from('transactions')
-          .insert({
-            account_id: formData.account_id,
-            category_id: formData.category_id || null,
-            amount: formData.amount,
-            currency: 'USD', // Default currency
-            transaction_date: formData.transaction_date.toISOString().split('T')[0],
-            description: formData.description || '',
-            merchant: formData.merchant,
-            status: formData.status,
-          });
-          
-        if (error) throw error;
-        
-        toast({
-          title: "Transaction added",
-          description: "Your new transaction has been added successfully."
-        });
-      }
+      // In production, this would update the Supabase backend
+      console.log("Saving transaction:", formData);
+      
+      toast({
+        title: formData.transaction_id ? "Transaction updated" : "Transaction added",
+        description: `Your transaction has been ${formData.transaction_id ? "updated" : "added"} successfully.`
+      });
       
       // Refresh the transaction list
       refetchTransactions();
@@ -235,12 +191,8 @@ export default function Transactions() {
   // Handle transaction deletion
   const handleDeleteTransaction = async (transactionId: string) => {
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .delete()
-        .eq('transaction_id', transactionId);
-        
-      if (error) throw error;
+      // In production, this would delete from Supabase
+      console.log("Deleting transaction:", transactionId);
       
       toast({
         title: "Transaction deleted",
@@ -262,12 +214,8 @@ export default function Transactions() {
   // Handle batch operations
   const handleBatchDelete = async () => {
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .delete()
-        .in('transaction_id', selectedTransactions);
-        
-      if (error) throw error;
+      // In production, this would batch delete from Supabase
+      console.log("Batch deleting transactions:", selectedTransactions);
       
       toast({
         title: "Transactions deleted",
@@ -289,12 +237,8 @@ export default function Transactions() {
 
   const handleBatchCategory = async (categoryId: string) => {
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .update({ category_id: categoryId })
-        .in('transaction_id', selectedTransactions);
-        
-      if (error) throw error;
+      // In production, this would update categories in Supabase
+      console.log("Batch categorizing transactions:", selectedTransactions, "to category:", categoryId);
       
       toast({
         title: "Transactions categorized",
