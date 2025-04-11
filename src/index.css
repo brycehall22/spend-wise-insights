@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,16 +14,16 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 225 50% 16%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
+    --secondary: 39 97% 53%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
+    --accent: 39 97% 53%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -34,21 +35,14 @@
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 225 50% 16%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 39 97% 53%;
+    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+    --sidebar-accent: 0 0% 90%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 225 50% 12%;
+    --sidebar-ring: 39 97% 53%;
   }
 
   .dark {
@@ -64,14 +58,14 @@
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 39 97% 53%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 39 97% 53%;
+    --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
@@ -79,14 +73,6 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -96,6 +82,50 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-spendwise-platinum text-foreground;
+  }
+}
+
+@layer utilities {
+  .budget-card {
+    @apply bg-white rounded-lg shadow-md p-5 hover:shadow-lg transition-shadow duration-300;
+  }
+
+  .stat-card {
+    @apply bg-white rounded-lg shadow-md p-4 transition-all duration-300 hover:shadow-lg;
+  }
+
+  .card-transition {
+    @apply transition-all duration-300 ease-in-out;
+  }
+  
+  .gradient-border-card {
+    @apply relative p-6 rounded-xl overflow-hidden bg-white shadow-md;
+  }
+  
+  .gradient-border-card::before {
+    @apply content-[''] absolute inset-0 -z-10 rounded-xl bg-gradient-to-r from-spendwise-oxford via-spendwise-oxford to-spendwise-orange;
+    padding: 2px;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  
+  .link-with-hover {
+    @apply relative inline-flex items-center gap-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spendwise-oxford focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+    @apply after:absolute after:h-[2px] after:bg-spendwise-orange after:bottom-0 after:left-0 after:w-0 after:transition-all after:duration-300;
+    @apply hover:after:w-full;
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .dashboard-grid {
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    }
   }
 }
