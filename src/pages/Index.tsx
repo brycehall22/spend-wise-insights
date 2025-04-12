@@ -8,8 +8,7 @@ import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import SavingsGoalsWidget from "@/components/dashboard/SavingsGoalsWidget";
 import SpendingByCategoryChart from "@/components/dashboard/SpendingByCategoryChart";
 import SubscriptionsWidget from "@/components/dashboard/SubscriptionsWidget";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import QuickAddTransaction from "@/components/dashboard/QuickAddTransaction";
 
 export default function Index() {
   return (
@@ -26,9 +25,7 @@ export default function Index() {
               </div>
               
               <div className="mt-4 sm:mt-0 flex space-x-2">
-                <Button className="bg-spendwise-orange hover:bg-spendwise-orange/90 text-white flex items-center gap-1">
-                  <Plus size={16} /> Add Transaction
-                </Button>
+                <QuickAddTransaction />
               </div>
             </div>
             
