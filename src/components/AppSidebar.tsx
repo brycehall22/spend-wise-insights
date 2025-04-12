@@ -1,11 +1,12 @@
 
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Calendar,
   Home,
   LineChart,
+  LogOut,
   Menu,
   PiggyBank,
   Settings,
@@ -14,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 type NavItemProps = {
   icon: React.ReactNode;
@@ -42,9 +45,22 @@ const NavItem = ({ icon, label, href, isActive, onClick }: NavItemProps) => (
 export default function AppSidebar() {
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const isActive = (path: string) => location.pathname === path;
   const closeMobileMenu = () => setIsMobileOpen(false);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success("Signed out successfully");
+      navigate("/auth");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast.error("There was a problem signing out");
+    }
+  };
 
   const navItems = [
     { icon: <Home size={20} />, label: "Dashboard", href: "/" },
@@ -105,15 +121,38 @@ export default function AppSidebar() {
 
         {/* User profile section */}
         <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-spendwise-orange text-spendwise-oxford flex items-center justify-center font-bold">
-              JS
+          {user ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-spendwise-orange text-spendwise-oxford flex items-center justify-center font-bold">
+                  {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || "U"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">
+                    {user.user_metadata?.full_name || "User"}
+                  </p>
+                  <p className="text-xs text-white/70 truncate">{user.email}</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-white/80 hover:text-white rounded-md hover:bg-white/10 transition-colors"
+              >
+                <LogOut size={18} />
+                <span>Sign Out</span>
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">John Smith</p>
-              <p className="text-xs text-white/70 truncate">john@example.com</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <Link
+                to="/auth"
+                className="w-full px-3 py-2 text-center bg-spendwise-orange text-white rounded-md hover:bg-spendwise-orange/90 transition-colors"
+              >
+                Sign In
+              </Link>
             </div>
-          </div>
+          )}
         </div>
       </aside>
 

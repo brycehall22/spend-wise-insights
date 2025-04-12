@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import PageTemplate from "./PageTemplate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +17,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "@/hooks/use-toast";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
-// Mock data for financial goals
 interface Goal {
   id: string;
   name: string;
@@ -68,7 +66,6 @@ const mockGoals: Goal[] = [
   }
 ];
 
-// Form schema for goal creation/editing
 const goalSchema = z.object({
   name: z.string().min(1, "Goal name is required"),
   targetAmount: z.coerce.number().positive("Amount must be positive"),
@@ -87,7 +84,6 @@ export default function Goals() {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
 
-  // Setup form
   const form = useForm<GoalFormValues>({
     resolver: zodResolver(goalSchema),
     defaultValues: {
@@ -100,10 +96,8 @@ export default function Goals() {
     },
   });
 
-  // Handle form submission
   const onSubmit = (values: GoalFormValues) => {
     if (editingGoal) {
-      // Update existing goal
       const updatedGoals = goals.map(goal => 
         goal.id === editingGoal.id ? { ...values, id: goal.id } : goal
       );
@@ -113,10 +107,14 @@ export default function Goals() {
         description: `${values.name} has been updated successfully`,
       });
     } else {
-      // Add new goal
       const newGoal: Goal = {
         id: `g${goals.length + 1}`,
-        ...values,
+        name: values.name, 
+        targetAmount: values.targetAmount,
+        currentAmount: values.currentAmount,
+        deadline: values.deadline,
+        category: values.category,
+        priority: values.priority
       };
       setGoals([...goals, newGoal]);
       toast({
@@ -130,7 +128,6 @@ export default function Goals() {
     form.reset();
   };
 
-  // Handle edit goal
   const handleEditGoal = (goal: Goal) => {
     setEditingGoal(goal);
     form.reset({
@@ -144,7 +141,6 @@ export default function Goals() {
     setIsAddOpen(true);
   };
 
-  // Handle delete goal
   const handleDeleteGoal = (id: string) => {
     const updatedGoals = goals.filter(goal => goal.id !== id);
     setGoals(updatedGoals);
@@ -154,7 +150,6 @@ export default function Goals() {
     });
   };
 
-  // Calculate monthly contribution needed
   const calculateMonthlyContribution = (goal: Goal) => {
     const remaining = goal.targetAmount - goal.currentAmount;
     const today = new Date();
@@ -165,7 +160,6 @@ export default function Goals() {
     return monthsLeft > 0 ? remaining / monthsLeft : remaining;
   };
 
-  // Calculate progress percentage
   const calculateProgress = (current: number, target: number) => {
     return Math.min(Math.round((current / target) * 100), 100);
   };
@@ -176,7 +170,6 @@ export default function Goals() {
       subtitle="Set and track your financial goals"
     >
       <div className="grid grid-cols-1 gap-6">
-        {/* Goals summary */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Your Goals</CardTitle>

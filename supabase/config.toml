@@ -1,1 +1,6 @@
+
 project_id = "fjmhhgvnrsvblibgprgc"
+
+[auth.email]
+# Email auth provider is enabled
+enabled = true
