@@ -1,3 +1,4 @@
+
 export type DbAccount = {
   account_id: string;
   user_id: string;

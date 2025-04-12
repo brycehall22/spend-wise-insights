@@ -299,7 +299,7 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   if (error) throw error;
   
   // Format data
-  const transactions = (data || []).map(item => {
+  const transactions = (data || []).map((item: DbTransactionWithRelations) => {
     const transaction: any = {
       id: item.transaction_id,
       date: item.transaction_date,

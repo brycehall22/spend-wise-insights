@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import PageTemplate from './PageTemplate';
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +18,7 @@ import {
 import TransactionFilters from '@/components/transactions/TransactionFilters';
 import AddTransactionDialog from '@/components/transactions/AddTransactionDialog';
 import BatchActionsBar from '@/components/transactions/BatchActionsBar';
-import { TransactionFilter, Category, DbAccount } from '@/types/database.types';
+import { TransactionFilter, Category, DbCategory } from '@/types/database.types';
 import { 
   getTransactions, 
   deleteTransaction, 
@@ -298,7 +299,7 @@ export default function Transactions() {
           <TransactionFilters 
             onApplyFilters={handleFilterChange}
             initialFilters={filters}
-            categories={categories || []}
+            categories={(categories || []) as Category[]}
             accounts={accounts || []}
           />
         </Card>
