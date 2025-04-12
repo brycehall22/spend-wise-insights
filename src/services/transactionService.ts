@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { DbTransaction, Transaction, TransactionFilter, FinancialSummary } from "@/types/database.types";
 
@@ -188,11 +187,11 @@ export const deleteTransaction = async (transactionId: string): Promise<void> =>
 };
 
 export const flagTransaction = async (transactionId: string, isFlagged: boolean): Promise<Transaction> => {
+  const updateData: Partial<DbTransaction> = { is_flagged: isFlagged };
+  
   const { data, error } = await supabase
     .from('transactions')
-    .update({ 
-      is_flagged: isFlagged 
-    })
+    .update(updateData)
     .eq('transaction_id', transactionId)
     .select()
     .single();

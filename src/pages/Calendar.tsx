@@ -426,6 +426,7 @@ export default function Calendar() {
         isOpen={isAddTransactionOpen}
         onClose={() => setIsAddTransactionOpen(false)}
         onAddTransaction={handleAddTransaction}
+        onTransactionAdded={handleAddTransaction}
         accounts={mockAccounts}
         categories={mockCategories}
       />

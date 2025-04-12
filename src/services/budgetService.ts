@@ -1,12 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
-import { DbBudget, Budget } from "@/types/database.types";
+import { Budget as BudgetType } from "@/types/database.types";
 import { format } from "date-fns";
 
 interface BudgetSummary {
   totalBudget: number;
   totalSpent: number;
   remainingBudget: number;
-  budgetsByCategory: Budget[];
+  budgetsByCategory: BudgetType[];
 }
 
 export const getBudgetSummary = async (month: string): Promise<BudgetSummary> => {
@@ -45,7 +45,7 @@ export const getBudgetSummary = async (month: string): Promise<BudgetSummary> =>
   if (transactionsError) throw transactionsError;
   
   // Map budgets with spending info
-  const budgetsWithSpending: Budget[] = (budgets || []).map(budget => {
+  const budgetsWithSpending: BudgetType[] = (budgets || []).map(budget => {
     // Find transactions for this category
     const categoryTransactions = transactions?.filter(t => 
       t.category_id === budget.category_id

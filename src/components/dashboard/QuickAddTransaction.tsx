@@ -43,6 +43,7 @@ export default function QuickAddTransaction() {
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         onAddTransaction={handleAddTransaction}
+        onTransactionAdded={handleAddTransaction}
         accounts={mockAccounts}
         categories={mockCategories}
       />

@@ -1,4 +1,3 @@
-
 export type DbAccount = {
   account_id: string;
   user_id: string;
@@ -30,7 +29,7 @@ export type Category = {
   user_id: string;
   name: string;
   is_income: boolean;
-  parent_category_id: string | null;
+  parent_category_id?: string | null;
   color: string | null;
   icon: string | null;
   created_at: string;
@@ -111,6 +110,6 @@ export interface FinancialSummary {
   totalIncome: number;
   totalExpenses: number;
   averageTransaction: number;
-  income: number; // Added for consistency with code usage
-  expenses: number; // Added for consistency with code usage
+  income: number; // Make sure this property exists
+  expenses: number; // Make sure this property exists
 }
