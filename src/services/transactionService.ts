@@ -1,6 +1,11 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { DbTransaction, Transaction, TransactionFilter, FinancialSummary } from "@/types/database.types";
+import { 
+  DbTransaction, 
+  Transaction, 
+  TransactionFilter, 
+  FinancialSummary,
+  DbTransactionWithRelations 
+} from "@/types/database.types";
 
 interface PaginationResult {
   totalCount: number;
@@ -10,12 +15,6 @@ interface PaginationResult {
 interface TransactionsResponse {
   transactions: Transaction[];
   pagination: PaginationResult;
-}
-
-// Type for database transaction records including the join tables
-interface DbTransactionWithRelations extends DbTransaction {
-  categories?: { name: string };
-  accounts?: { account_name: string; currency: string };
 }
 
 export const getTransactions = async (
@@ -88,7 +87,7 @@ export const getTransactions = async (
   if (error) throw error;
   
   // Format the results
-  const transactions: Transaction[] = (data || []).map((item: DbTransactionWithRelations) => {
+  const transactions: Transaction[] = (data || []).map((item: any) => {
     // Create a transaction object with properly defined types
     const transaction: Transaction = {
       transaction_id: item.transaction_id,
@@ -260,7 +259,7 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
     .select(`
       *,
       categories (name),
-      accounts (account_name)
+      accounts (account_name, currency)
     `)
     .eq('user_id', userId);
 
@@ -299,7 +298,7 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   if (error) throw error;
   
   // Format data
-  const transactions = (data || []).map((item: DbTransactionWithRelations) => {
+  const transactions = (data || []).map((item: any) => {
     const transaction: any = {
       id: item.transaction_id,
       date: item.transaction_date,

@@ -111,6 +111,12 @@ export interface FinancialSummary {
   totalIncome: number;
   totalExpenses: number;
   averageTransaction: number;
-  income: number; // Make sure this property exists
-  expenses: number; // Make sure this property exists
+  income: number;
+  expenses: number;
+}
+
+// Define the type for database transaction records including join tables
+export interface DbTransactionWithRelations extends DbTransaction {
+  categories?: { name: string };
+  accounts?: { account_name: string; currency: string };
 }
