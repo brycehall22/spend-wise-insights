@@ -65,6 +65,19 @@ export default function BudgetCategoryList({ month, type }: BudgetCategoryListPr
         const percentSpent = budget.spent ? (budget.spent / budget.amount) * 100 : 0;
         const remaining = budget.amount - (budget.spent || 0);
         
+        // Apply custom styling based on budget status
+        const progressBarClass = remaining < 0 
+          ? "bg-red-100" 
+          : percentSpent > 90 
+            ? "bg-amber-100" 
+            : "bg-green-100";
+            
+        const indicatorClass = remaining < 0 
+          ? "bg-red-600" 
+          : percentSpent > 90 
+            ? "bg-amber-600" 
+            : "bg-green-600";
+            
         return (
           <div key={budget.budget_id} className="space-y-2">
             <div className="flex justify-between items-center">
@@ -97,21 +110,7 @@ export default function BudgetCategoryList({ month, type }: BudgetCategoryListPr
             
             <Progress 
               value={Math.min(percentSpent, 100)} 
-              className={cn(
-                "h-2",
-                remaining < 0 
-                  ? "bg-red-100" 
-                  : percentSpent > 90 
-                    ? "bg-amber-100" 
-                    : "bg-green-100"
-              )}
-              indicatorClassName={cn(
-                remaining < 0 
-                  ? "bg-red-600" 
-                  : percentSpent > 90 
-                    ? "bg-amber-600" 
-                    : "bg-green-600"
-              )}
+              className={cn("h-2", progressBarClass)} 
             />
           </div>
         );
