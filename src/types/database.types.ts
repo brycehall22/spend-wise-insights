@@ -25,10 +25,16 @@ export type DbCategory = {
   updated_at: string;
 };
 
-export type Category = Omit<DbCategory, 'parent_category_id' | 'color' | 'icon'> & {
+export type Category = {
+  category_id: string;
+  user_id: string;
+  name: string;
+  is_income: boolean;
   parent_category_id: string | null;
   color: string | null;
   icon: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type DbTransaction = {
@@ -105,4 +111,6 @@ export interface FinancialSummary {
   totalIncome: number;
   totalExpenses: number;
   averageTransaction: number;
+  income: number; // Added for consistency with code usage
+  expenses: number; // Added for consistency with code usage
 }

@@ -27,9 +27,13 @@ interface Category {
 }
 
 export interface AddTransactionDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
+  // Allow usage of either isOpen or open for backwards compatibility
+  isOpen?: boolean;
+  open?: boolean;
+  onClose?: () => void;
+  onOpenChange?: (open: boolean) => void;
   onTransactionAdded: (data: any) => void;
+  onAddTransaction?: (data: any) => void;
   accounts?: Account[];
   categories?: Category[];
   initialDate?: Date;
@@ -48,12 +52,20 @@ type TransactionFormValues = z.infer<typeof transactionSchema>;
 
 export function AddTransactionDialog({
   isOpen,
+  open,
   onClose,
+  onOpenChange,
   onTransactionAdded,
+  onAddTransaction,
   accounts = [],
   categories = [],
   initialDate,
 }: AddTransactionDialogProps) {
+  // For backwards compatibility, handle both prop styles
+  const dialogOpen = isOpen ?? open ?? false;
+  const handleClose = onClose ?? (() => onOpenChange?.(false));
+  const handleTransactionAdded = onTransactionAdded ?? onAddTransaction ?? (() => {});
+
   const [transactionType, setTransactionType] = useState<"expense" | "income">("expense");
   
   const form = useForm<TransactionFormValues>({
@@ -76,12 +88,12 @@ export function AddTransactionDialog({
   }, [initialDate, form]);
 
   const handleSubmit = (values: TransactionFormValues) => {
-    onTransactionAdded({
+    handleTransactionAdded({
       ...values,
       type: transactionType,
     });
     form.reset();
-    onClose();
+    handleClose();
   };
 
   const filteredCategories = categories.filter(
@@ -90,7 +102,7 @@ export function AddTransactionDialog({
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={dialogOpen} onOpenChange={onOpenChange ?? (() => handleClose())}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Transaction</DialogTitle>

@@ -25,7 +25,7 @@ const mockCategories = [
 export default function QuickAddTransaction() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const handleAddTransaction = (transactionData) => {
+  const handleAddTransaction = (transactionData: any) => {
     console.log("Adding transaction:", transactionData);
     // In a real app, you would dispatch this to Redux or make an API call
   };
@@ -40,8 +40,8 @@ export default function QuickAddTransaction() {
       </Button>
       
       <AddTransactionDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
         onAddTransaction={handleAddTransaction}
         accounts={mockAccounts}
         categories={mockCategories}

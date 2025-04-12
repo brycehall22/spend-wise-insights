@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-// Mock data for financial events
 interface FinancialEvent {
   id: string;
   title: string;
@@ -106,37 +105,30 @@ export default function Calendar() {
   const [selectedEvent, setSelectedEvent] = useState<FinancialEvent | null>(null);
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   
-  // Navigate between months
   const nextMonth = () => setDisplayMonth(addMonths(displayMonth, 1));
   const prevMonth = () => setDisplayMonth(subMonths(displayMonth, 1));
   
-  // Generate days for the current month view
   const monthStart = startOfMonth(displayMonth);
   const monthEnd = endOfMonth(displayMonth);
   const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
   
-  // Fill the starting days of the calendar grid
   const startDay = getDay(monthStart);
   const blanks = Array(startDay).fill(null);
   
-  // Get events for a specific date
   const getEventsForDay = (date: Date) => {
     return events.filter(event => isSameDay(event.date, date));
   };
   
-  // Count events by type for a specific date
   const countEventsByType = (date: Date, type: FinancialEvent["type"]) => {
     return events.filter(event => isSameDay(event.date, date) && event.type === type).length;
   };
   
-  // Calculate sum of events by type for a specific date
   const sumEventsByType = (date: Date, type: FinancialEvent["type"]) => {
     return events
       .filter(event => isSameDay(event.date, date) && event.type === type)
       .reduce((sum, event) => sum + event.amount, 0);
   };
   
-  // Format amount with currency symbol
   const formatCurrency = (amount: number) => {
     return `$${amount.toLocaleString(undefined, {
       minimumFractionDigits: 2,
@@ -144,7 +136,6 @@ export default function Calendar() {
     })}`;
   };
   
-  // Mock data for accounts and categories (for AddTransactionDialog)
   const mockAccounts = [
     { account_id: "acc1", account_name: "Checking Account" },
     { account_id: "acc2", account_name: "Savings Account" },
@@ -162,10 +153,8 @@ export default function Calendar() {
     { category_id: "cat8", name: "Investments", is_income: true },
   ];
 
-  // Handle adding a transaction
   const handleAddTransaction = (transactionData: any) => {
     console.log("Adding transaction:", transactionData);
-    // In a real app, you would dispatch this to Redux or make an API call
   };
 
   return (
@@ -174,7 +163,6 @@ export default function Calendar() {
       subtitle="View and manage your scheduled transactions and bills"
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Calendar */}
         <Card className="md:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle>
@@ -196,21 +184,17 @@ export default function Calendar() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1">
-              {/* Day labels */}
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
                 <div key={day} className="text-center font-medium p-2 text-sm">
                   {day}
                 </div>
               ))}
               
-              {/* Empty cells */}
               {blanks.map((_, index) => (
                 <div key={`blank-${index}`} className="aspect-square border rounded-md bg-gray-50"></div>
               ))}
               
-              {/* Calendar days */}
               {monthDays.map((day) => {
                 const isToday = isSameDay(day, new Date());
                 const isSelected = isSameDay(day, selectedDate);
@@ -283,7 +267,6 @@ export default function Calendar() {
           </CardContent>
         </Card>
         
-        {/* Events for selected day */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg">
@@ -367,7 +350,6 @@ export default function Calendar() {
         </Card>
       </div>
       
-      {/* Event detail dialog */}
       <Dialog
         open={selectedEvent !== null}
         onOpenChange={(open) => !open && setSelectedEvent(null)}
@@ -440,10 +422,9 @@ export default function Calendar() {
         </DialogContent>
       </Dialog>
       
-      {/* Add Transaction Dialog */}
       <AddTransactionDialog
-        open={isAddTransactionOpen}
-        onOpenChange={setIsAddTransactionOpen}
+        isOpen={isAddTransactionOpen}
+        onClose={() => setIsAddTransactionOpen(false)}
         onAddTransaction={handleAddTransaction}
         accounts={mockAccounts}
         categories={mockCategories}

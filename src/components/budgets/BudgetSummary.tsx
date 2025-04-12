@@ -14,18 +14,20 @@ type BudgetSummaryProps = {
 };
 
 export default function BudgetSummary({ month }: BudgetSummaryProps) {
+  const monthString = format(month, 'yyyy-MM');
+  
   // Get budget summary for the month
   const { data: budgetSummary, isLoading: loadingBudget } = useQuery({
-    queryKey: ['budgetSummary', month.toISOString().substring(0, 7)],
-    queryFn: () => getBudgetSummary(month),
+    queryKey: ['budgetSummary', monthString],
+    queryFn: () => getBudgetSummary(monthString),
   });
 
   // Get transaction stats for the month
   const { data: transactionStats, isLoading: loadingTransactions } = useQuery({
-    queryKey: ['transactionStats', month.toISOString().substring(0, 7)],
+    queryKey: ['transactionStats', monthString],
     queryFn: () => {
-      const startDate = new Date(month.getFullYear(), month.getMonth(), 1);
-      const endDate = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+      const startDate = new Date(month.getFullYear(), month.getMonth(), 1).toISOString();
+      const endDate = new Date(month.getFullYear(), month.getMonth() + 1, 0).toISOString();
       return getTransactionStats(startDate, endDate);
     },
   });

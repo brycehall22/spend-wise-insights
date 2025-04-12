@@ -190,7 +190,9 @@ export const deleteTransaction = async (transactionId: string): Promise<void> =>
 export const flagTransaction = async (transactionId: string, isFlagged: boolean): Promise<Transaction> => {
   const { data, error } = await supabase
     .from('transactions')
-    .update({ is_flagged: isFlagged })
+    .update({ 
+      is_flagged: isFlagged 
+    })
     .eq('transaction_id', transactionId)
     .select()
     .single();
@@ -359,6 +361,8 @@ export const getTransactionStats = async (startDate?: string, endDate?: string):
     totalTransactions,
     totalIncome,
     totalExpenses,
-    averageTransaction
+    averageTransaction,
+    income: totalIncome,
+    expenses: totalExpenses
   };
 };

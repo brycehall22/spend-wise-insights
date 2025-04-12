@@ -17,12 +17,13 @@ import SpendingByCategoryChart from "@/components/dashboard/SpendingByCategoryCh
 export default function Dashboard() {
   // Get current month
   const currentMonth = new Date();
-  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-  const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+  const monthString = format(currentMonth, 'yyyy-MM');
+  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toISOString();
+  const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).toISOString();
 
   // Get transaction stats
   const { data: transactionStats, isLoading: loadingStats } = useQuery({
-    queryKey: ['transactionStats', format(currentMonth, 'yyyy-MM')],
+    queryKey: ['transactionStats', monthString],
     queryFn: () => getTransactionStats(firstDayOfMonth, lastDayOfMonth),
   });
 
@@ -34,8 +35,8 @@ export default function Dashboard() {
 
   // Get budget summary
   const { data: budgetSummary, isLoading: loadingBudget } = useQuery({
-    queryKey: ['budgetSummary', format(currentMonth, 'yyyy-MM')],
-    queryFn: () => getBudgetSummary(currentMonth),
+    queryKey: ['budgetSummary', monthString],
+    queryFn: () => getBudgetSummary(monthString),
   });
 
   // Get categories for charts

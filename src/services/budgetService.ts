@@ -1,6 +1,81 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { DbBudget, Budget } from "@/types/database.types";
 import { format } from "date-fns";
+
+interface BudgetSummary {
+  totalBudget: number;
+  totalSpent: number;
+  remainingBudget: number;
+  budgetsByCategory: Budget[];
+}
+
+export const getBudgetSummary = async (month: string): Promise<BudgetSummary> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to fetch budgets');
+  }
+  
+  // Get all budgets for the given month
+  const { data: budgets, error: budgetsError } = await supabase
+    .from('budgets')
+    .select(`
+      *,
+      categories (name)
+    `)
+    .eq('user_id', userId)
+    .eq('month', month);
+    
+  if (budgetsError) throw budgetsError;
+  
+  // Get all transactions for the month to calculate spending
+  const startDate = new Date(month);
+  const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+  
+  const { data: transactions, error: transactionsError } = await supabase
+    .from('transactions')
+    .select('amount, category_id')
+    .eq('user_id', userId)
+    .gte('transaction_date', format(startDate, 'yyyy-MM-dd'))
+    .lte('transaction_date', format(endDate, 'yyyy-MM-dd'))
+    .lt('amount', 0); // Only negative amounts (expenses)
+    
+  if (transactionsError) throw transactionsError;
+  
+  // Map budgets with spending info
+  const budgetsWithSpending: Budget[] = (budgets || []).map(budget => {
+    // Find transactions for this category
+    const categoryTransactions = transactions?.filter(t => 
+      t.category_id === budget.category_id
+    ) || [];
+    
+    // Calculate spending (convert to positive number for easier comparison)
+    const spent = categoryTransactions.reduce(
+      (total, t) => total + Math.abs(t.amount), 
+      0
+    );
+    
+    return {
+      ...budget,
+      category_name: budget.categories?.name,
+      spent
+    };
+  });
+  
+  // Calculate totals
+  const totalBudget = budgetsWithSpending.reduce((sum, budget) => sum + Number(budget.amount), 0);
+  const totalSpent = budgetsWithSpending.reduce((sum, budget) => sum + Number(budget.spent || 0), 0);
+  const remainingBudget = totalBudget - totalSpent;
+  
+  return {
+    totalBudget,
+    totalSpent,
+    remainingBudget,
+    budgetsByCategory: budgetsWithSpending
+  };
+};
 
 export type Budget = {
   budget_id: string;
@@ -217,36 +292,4 @@ export const createBudgetFromTemplate = async (month: Date, templateType: 'previ
       if (insertError) throw insertError;
     }
   }
-};
-
-export const getBudgetSummary = async (month: Date): Promise<{
-  totalBudget: number;
-  totalSpent: number;
-  remainingBudget: number;
-  categories: { name: string; budget: number; spent: number; remaining: number }[];
-}> => {
-  const budgets = await getBudgets(month);
-  
-  let totalBudget = 0;
-  let totalSpent = 0;
-  
-  const categories = budgets.map(budget => {
-    const spent = budget.spent || 0;
-    totalBudget += budget.amount;
-    totalSpent += spent;
-    
-    return {
-      name: budget.category_name || 'Uncategorized',
-      budget: budget.amount,
-      spent,
-      remaining: budget.amount - spent
-    };
-  });
-  
-  return {
-    totalBudget,
-    totalSpent,
-    remainingBudget: totalBudget - totalSpent,
-    categories
-  };
 };
