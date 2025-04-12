@@ -18,10 +18,19 @@ export const getBudgets = async (month: Date): Promise<Budget[]> => {
   // Format as YYYY-MM-01 for first day of month
   const monthStr = format(month, 'yyyy-MM-01');
   
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to fetch budgets');
+  }
+  
   const { data: budgets, error } = await supabase
     .from('budgets')
     .select('*, categories(name)')
-    .eq('month', monthStr);
+    .eq('month', monthStr)
+    .eq('user_id', userId);
   
   if (error) throw error;
   
@@ -34,7 +43,8 @@ export const getBudgets = async (month: Date): Promise<Budget[]> => {
     .select('category_id, amount')
     .gte('transaction_date', startDate)
     .lte('transaction_date', endDate)
-    .lt('amount', 0); // Only expenses
+    .lt('amount', 0) // Only expenses
+    .eq('user_id', userId);
   
   if (transactionsError) throw transactionsError;
   
@@ -59,9 +69,23 @@ export const getBudgets = async (month: Date): Promise<Budget[]> => {
 };
 
 export const createBudget = async (budget: Omit<Budget, 'budget_id' | 'created_at' | 'updated_at'>): Promise<Budget> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to create a budget');
+  }
+  
+  // Ensure user_id is set
+  const budgetWithUserId = {
+    ...budget,
+    user_id: userId
+  };
+  
   const { data, error } = await supabase
     .from('budgets')
-    .insert(budget)
+    .insert(budgetWithUserId)
     .select('*, categories(name)')
     .single();
   
@@ -106,6 +130,14 @@ export const createBudgetFromTemplate = async (month: Date, templateType: 'previ
   // Get the target month
   const targetMonth = format(month, 'yyyy-MM-01');
   
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to create a budget');
+  }
+  
   if (templateType === 'previous') {
     // Get the previous month's date
     const previousMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
@@ -115,14 +147,15 @@ export const createBudgetFromTemplate = async (month: Date, templateType: 'previ
     const { data: previousBudgets, error } = await supabase
       .from('budgets')
       .select('*')
-      .eq('month', previousMonthStr);
+      .eq('month', previousMonthStr)
+      .eq('user_id', userId);
       
     if (error) throw error;
     
     // Copy previous month's budgets to current month
     if (previousBudgets.length > 0) {
       const newBudgets = previousBudgets.map(budget => ({
-        user_id: budget.user_id,
+        user_id: userId,
         category_id: budget.category_id,
         month: targetMonth,
         amount: budget.amount
@@ -145,7 +178,8 @@ export const createBudgetFromTemplate = async (month: Date, templateType: 'previ
       .select('category_id, amount')
       .gte('transaction_date', threeMonthsAgoStr)
       .lt('transaction_date', targetMonth)
-      .lt('amount', 0); // Only expenses
+      .lt('amount', 0) // Only expenses
+      .eq('user_id', userId);
       
     if (error) throw error;
     
@@ -161,14 +195,14 @@ export const createBudgetFromTemplate = async (month: Date, templateType: 'previ
     });
     
     // Create budgets based on average spending
-    const newBudgets = Object.entries(spendingByCategory).map(([categoryId, { total, count }]) => {
+    const newBudgets = Object.entries(spendingByCategory).map(([categoryId, { total }]) => {
       if (categoryId === 'uncategorized') return null;
       
       // Calculate monthly average (last 3 months / 3)
       const monthlyAverage = total / 3;
       
       return {
-        user_id: (supabase.auth.getUser().then(({ data }) => data.user?.id)) as unknown as string,
+        user_id: userId,
         category_id: categoryId,
         month: targetMonth,
         amount: Math.round(monthlyAverage * 100) / 100 // Round to 2 decimal places
@@ -183,4 +217,36 @@ export const createBudgetFromTemplate = async (month: Date, templateType: 'previ
       if (insertError) throw insertError;
     }
   }
+};
+
+export const getBudgetSummary = async (month: Date): Promise<{
+  totalBudget: number;
+  totalSpent: number;
+  remainingBudget: number;
+  categories: { name: string; budget: number; spent: number; remaining: number }[];
+}> => {
+  const budgets = await getBudgets(month);
+  
+  let totalBudget = 0;
+  let totalSpent = 0;
+  
+  const categories = budgets.map(budget => {
+    const spent = budget.spent || 0;
+    totalBudget += budget.amount;
+    totalSpent += spent;
+    
+    return {
+      name: budget.category_name || 'Uncategorized',
+      budget: budget.amount,
+      spent,
+      remaining: budget.amount - spent
+    };
+  });
+  
+  return {
+    totalBudget,
+    totalSpent,
+    remainingBudget: totalBudget - totalSpent,
+    categories
+  };
 };

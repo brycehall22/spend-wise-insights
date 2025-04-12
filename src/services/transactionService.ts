@@ -96,9 +96,23 @@ export const getTransactionById = async (transactionId: string): Promise<Transac
 };
 
 export const createTransaction = async (transaction: Omit<Transaction, 'transaction_id' | 'created_at' | 'updated_at'>): Promise<Transaction> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to create a transaction');
+  }
+  
+  // Ensure user_id is set
+  const transactionWithUserId = {
+    ...transaction,
+    user_id: userId
+  };
+  
   const { data, error } = await supabase
     .from('transactions')
-    .insert(transaction)
+    .insert(transactionWithUserId)
     .select('*, accounts(account_name), categories(name)')
     .single();
   
@@ -137,4 +151,109 @@ export const deleteTransaction = async (transactionId: string): Promise<void> =>
     .eq('transaction_id', transactionId);
   
   if (error) throw error;
+};
+
+// Batch operations
+export const batchDeleteTransactions = async (transactionIds: string[]): Promise<void> => {
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .in('transaction_id', transactionIds);
+  
+  if (error) throw error;
+};
+
+export const batchUpdateCategory = async (transactionIds: string[], categoryId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('transactions')
+    .update({ category_id: categoryId })
+    .in('transaction_id', transactionIds);
+  
+  if (error) throw error;
+};
+
+export const batchFlagTransactions = async (transactionIds: string[], isFlagged: boolean): Promise<void> => {
+  const { error } = await supabase
+    .from('transactions')
+    .update({ is_flagged: isFlagged })
+    .in('transaction_id', transactionIds);
+  
+  if (error) throw error;
+};
+
+export const getTransactionStats = async (
+  dateFrom?: Date, 
+  dateTo?: Date
+): Promise<{ income: number; expenses: number; balance: number }> => {
+  // Default to current month if no dates provided
+  const start = dateFrom 
+    ? dateFrom.toISOString().split('T')[0] 
+    : new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    
+  const end = dateTo
+    ? dateTo.toISOString().split('T')[0]
+    : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0];
+  
+  // Get all transactions within date range
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('amount')
+    .gte('transaction_date', start)
+    .lte('transaction_date', end);
+    
+  if (error) throw error;
+  
+  // Calculate totals
+  let income = 0;
+  let expenses = 0;
+  
+  data.forEach(transaction => {
+    const amount = Number(transaction.amount);
+    if (amount > 0) {
+      income += amount;
+    } else {
+      expenses += Math.abs(amount);
+    }
+  });
+  
+  return {
+    income,
+    expenses,
+    balance: income - expenses
+  };
+};
+
+// Export functionality
+export const exportTransactions = async (format: 'csv' | 'json', filters?: TransactionFilter): Promise<string> => {
+  const transactions = await getTransactions(filters);
+  
+  if (format === 'csv') {
+    const headers = [
+      'Transaction ID',
+      'Date',
+      'Description',
+      'Merchant',
+      'Category',
+      'Account',
+      'Amount',
+      'Currency',
+      'Status'
+    ].join(',');
+    
+    const rows = transactions.map(t => [
+      t.transaction_id,
+      t.transaction_date,
+      `"${t.description.replace(/"/g, '""')}"`,
+      `"${t.merchant.replace(/"/g, '""')}"`,
+      t.category_name || 'Uncategorized',
+      t.account_name,
+      t.amount,
+      t.currency,
+      t.status
+    ].join(',')).join('\n');
+    
+    return `${headers}\n${rows}`;
+  } else {
+    return JSON.stringify(transactions, null, 2);
+  }
 };

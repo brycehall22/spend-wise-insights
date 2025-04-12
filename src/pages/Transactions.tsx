@@ -31,20 +31,19 @@ import {
   PaginationNext,
   PaginationPrevious
 } from "@/components/ui/pagination";
-import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Transaction, Account, Category } from "@/types/database.types";
-
-interface CategoryWithoutParent {
-  category_id: string;
-  name: string;
-  parent_category_id: string | null;
-}
-
-interface AccountSimple {
-  account_id: string;
-  account_name: string;
-}
+import { getCategories } from "@/services/categoryService";
+import { getAccounts } from "@/services/accountService";
+import { 
+  getTransactions, 
+  createTransaction, 
+  updateTransaction, 
+  deleteTransaction,
+  batchDeleteTransactions,
+  batchUpdateCategory,
+  TransactionFilter,
+  exportTransactions
+} from "@/services/transactionService";
 
 export default function Transactions() {
   const { toast } = useToast();
@@ -57,96 +56,47 @@ export default function Transactions() {
   const [sortField, setSortField] = useState<string>("transaction_date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  // Mock transactions data for development
-  const [mockTransactions] = useState<TransactionType[]>([
-    {
-      transaction_id: "1",
-      account_id: "1",
-      account_name: "Chase Checking",
-      category_id: "101",
-      category_name: "Groceries",
-      amount: -45.67,
-      currency: "USD",
-      transaction_date: "2025-04-10",
-      description: "Weekly grocery shopping",
-      merchant: "Trader Joe's",
-      status: "cleared",
-      is_flagged: false
-    },
-    {
-      transaction_id: "2",
-      account_id: "1",
-      account_name: "Chase Checking",
-      category_id: "102",
-      category_name: "Restaurants",
-      amount: -28.50,
-      currency: "USD",
-      transaction_date: "2025-04-09",
-      description: "Dinner with friends",
-      merchant: "Olive Garden",
-      status: "cleared",
-      is_flagged: false
-    },
-    {
-      transaction_id: "3",
-      account_id: "2",
-      account_name: "Bank of America Savings",
-      category_id: "103",
-      category_name: "Salary",
-      amount: 1500.00,
-      currency: "USD",
-      transaction_date: "2025-04-05",
-      description: "Bi-weekly paycheck",
-      merchant: "Acme Corp",
-      status: "cleared",
-      is_flagged: false
-    }
-  ]);
+  // Fetch categories data 
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-  // Mock categories and accounts data for development
-  const [mockCategories] = useState<CategoryWithoutParent[]>([
-    { category_id: "101", name: "Groceries", parent_category_id: null },
-    { category_id: "102", name: "Restaurants", parent_category_id: null },
-    { category_id: "103", name: "Salary", parent_category_id: null },
-    { category_id: "104", name: "Entertainment", parent_category_id: null },
-    { category_id: "105", name: "Transportation", parent_category_id: null },
-  ]);
+  // Fetch accounts data
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: getAccounts,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-  const [mockAccounts] = useState<AccountSimple[]>([
-    { account_id: "1", account_name: "Chase Checking" },
-    { account_id: "2", account_name: "Bank of America Savings" },
-    { account_id: "3", account_name: "Amex Credit Card" },
-  ]);
+  // Convert filters to TransactionFilter type
+  const convertFiltersToQueryParams = (): TransactionFilter | undefined => {
+    if (!filters) return undefined;
+    
+    return {
+      search: filters.search,
+      dateRange: filters.dateRange,
+      accounts: filters.accounts,
+      categories: filters.categories,
+      amountRange: filters.amountRange,
+      transactionType: filters.transactionType,
+      status: filters.status,
+    };
+  };
 
-  // Fetch transactions data - temporarily using mock data
-  const { data: transactionsData, isLoading: transactionsLoading, error: transactionsError, refetch: refetchTransactions } = useQuery({
+  // Fetch transactions data
+  const { 
+    data: transactions = [], 
+    isLoading: transactionsLoading, 
+    error: transactionsError,
+    refetch: refetchTransactions
+  } = useQuery({
     queryKey: ['transactions', filters, sortField, sortDirection, currentPage, pageSize],
     queryFn: async () => {
-      // For development, return mock data instead of hitting the API
-      // In production, this would query the Supabase backend
-      console.log("Would fetch transactions with filters:", filters);
-      return mockTransactions;
-    },
-    enabled: true
-  });
-
-  // Fetch categories and accounts - temporarily using mock data
-  const { data: categories = mockCategories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      // For development, return mock data
-      return mockCategories;
-    },
-    enabled: true
-  });
-
-  const { data: accounts = mockAccounts } = useQuery({
-    queryKey: ['accounts'],
-    queryFn: async () => {
-      // For development, return mock data
-      return mockAccounts;
-    },
-    enabled: true
+      const queryFilters = convertFiltersToQueryParams();
+      return getTransactions(queryFilters);
+    }
   });
 
   // Get active filter count
@@ -168,15 +118,45 @@ export default function Transactions() {
   // Handle transaction form submission
   const handleSaveTransaction = async (formData: TransactionFormValues) => {
     try {
-      // In production, this would update the Supabase backend
-      console.log("Saving transaction:", formData);
+      if (formData.transaction_id) {
+        // Update existing transaction
+        await updateTransaction({
+          transaction_id: formData.transaction_id,
+          account_id: formData.account_id,
+          category_id: formData.category_id,
+          amount: formData.amount,
+          transaction_date: format(formData.transaction_date, 'yyyy-MM-dd'),
+          description: formData.description,
+          merchant: formData.merchant,
+          status: formData.status,
+        });
+        
+        toast({
+          title: "Transaction updated",
+          description: "Your transaction has been updated successfully."
+        });
+      } else {
+        // Create new transaction
+        await createTransaction({
+          account_id: formData.account_id,
+          category_id: formData.category_id,
+          amount: formData.amount,
+          transaction_date: format(formData.transaction_date, 'yyyy-MM-dd'),
+          description: formData.description,
+          merchant: formData.merchant,
+          status: formData.status,
+          user_id: '', // Will be set in the service
+          currency: 'USD', // Default currency
+        });
+        
+        toast({
+          title: "Transaction added",
+          description: "Your transaction has been added successfully."
+        });
+      }
       
-      toast({
-        title: formData.transaction_id ? "Transaction updated" : "Transaction added",
-        description: `Your transaction has been ${formData.transaction_id ? "updated" : "added"} successfully.`
-      });
-      
-      // Refresh the transaction list
+      // Close the dialog and refresh the transaction list
+      setFormDialogOpen(false);
       refetchTransactions();
       
     } catch (error: any) {
@@ -191,8 +171,7 @@ export default function Transactions() {
   // Handle transaction deletion
   const handleDeleteTransaction = async (transactionId: string) => {
     try {
-      // In production, this would delete from Supabase
-      console.log("Deleting transaction:", transactionId);
+      await deleteTransaction(transactionId);
       
       toast({
         title: "Transaction deleted",
@@ -214,8 +193,7 @@ export default function Transactions() {
   // Handle batch operations
   const handleBatchDelete = async () => {
     try {
-      // In production, this would batch delete from Supabase
-      console.log("Batch deleting transactions:", selectedTransactions);
+      await batchDeleteTransactions(selectedTransactions);
       
       toast({
         title: "Transactions deleted",
@@ -237,8 +215,7 @@ export default function Transactions() {
 
   const handleBatchCategory = async (categoryId: string) => {
     try {
-      // In production, this would update categories in Supabase
-      console.log("Batch categorizing transactions:", selectedTransactions, "to category:", categoryId);
+      await batchUpdateCategory(selectedTransactions, categoryId);
       
       toast({
         title: "Transactions categorized",
@@ -257,15 +234,23 @@ export default function Transactions() {
     }
   };
 
-  // Placeholder for flag operation
-  const handleBatchFlag = () => {
-    toast({
-      title: "Transactions flagged",
-      description: `${selectedTransactions.length} transactions have been flagged for review.`
-    });
-    
-    // In a real implementation, this would update the is_flagged field in the database
-    refetchTransactions();
+  // Handle batch flag operation
+  const handleBatchFlag = async () => {
+    try {
+      // In a real implementation, this would update the is_flagged field in the database
+      toast({
+        title: "Transactions flagged",
+        description: `${selectedTransactions.length} transactions have been flagged for review.`
+      });
+      
+      refetchTransactions();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "An error occurred while flagging the transactions.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Handle transaction selection
@@ -293,6 +278,37 @@ export default function Transactions() {
     setCurrentPage(1); // Reset to first page when filters change
   };
 
+  // Export data
+  const handleExport = async (format: 'csv' | 'json') => {
+    try {
+      const exportData = await exportTransactions(format, convertFiltersToQueryParams());
+      
+      // Create a downloadable file
+      const blob = new Blob([exportData], { 
+        type: format === 'csv' ? 'text/csv;charset=utf-8' : 'application/json' 
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions-export.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export completed",
+        description: `Transactions have been exported as ${format.toUpperCase()}.`
+      });
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error.message || "Failed to export transactions.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Open transaction form for editing
   const handleEditTransaction = (transaction: TransactionType) => {
     setEditingTransaction(transaction);
@@ -303,6 +319,32 @@ export default function Transactions() {
   const handleAddTransaction = () => {
     setEditingTransaction(undefined);
     setFormDialogOpen(true);
+  };
+
+  // Handle flagging a transaction
+  const handleFlagTransaction = async (id: string, flagged: boolean) => {
+    try {
+      // Update the transaction with the new flag status
+      await updateTransaction({
+        transaction_id: id,
+        is_flagged: flagged
+      });
+      
+      toast({
+        title: flagged ? "Transaction flagged" : "Flag removed",
+        description: flagged 
+          ? "Transaction has been flagged for review." 
+          : "Flag has been removed from the transaction."
+      });
+      
+      refetchTransactions();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "An error occurred while updating the transaction.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Show loading state
@@ -339,7 +381,7 @@ export default function Transactions() {
             </div>
             <h2 className="text-xl font-semibold mb-2">Error Loading Transactions</h2>
             <p className="text-gray-500 text-center max-w-md mb-6">
-              There was an error loading your transactions. Please try again later.
+              {(transactionsError as Error).message || "There was an error loading your transactions. Please try again later."}
             </p>
             <Button onClick={() => refetchTransactions()}>Retry</Button>
           </div>
@@ -348,7 +390,6 @@ export default function Transactions() {
     );
   }
 
-  const transactions = transactionsData || [];
   const totalPages = Math.ceil(transactions.length / pageSize); // In a real app, we'd get the total count from the API
 
   return (
@@ -369,8 +410,8 @@ export default function Transactions() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem>Export as CSV</DropdownMenuItem>
-                  <DropdownMenuItem>Export as PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('csv')}>Export as CSV</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('json')}>Export as JSON</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               
@@ -430,59 +471,58 @@ export default function Transactions() {
             onEdit={handleEditTransaction}
             onDelete={handleDeleteTransaction}
             onCategoryChange={handleBatchCategory}
-            onFlag={(id, flagged) => {
-              // This would be implemented in a real app
-              console.log(`Flagging transaction ${id}: ${flagged}`);
-            }}
+            onFlag={handleFlagTransaction}
             selectedTransactions={selectedTransactions}
             onSelect={handleSelectTransaction}
             showCheckboxes={true}
           />
           
-          <div className="flex items-center justify-between mt-6">
-            <div className="text-sm text-gray-500">
-              Showing {transactions.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, transactions.length)} of {transactions.length} transactions
-            </div>
-            
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious 
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (currentPage > 1) setCurrentPage(currentPage - 1);
-                    }}
-                  />
-                </PaginationItem>
-                
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <PaginationItem key={page}>
-                    <PaginationLink 
+          {transactions.length > 0 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-gray-500">
+                Showing {transactions.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, transactions.length)} of {transactions.length} transactions
+              </div>
+              
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
                       href="#"
-                      isActive={currentPage === page}
                       onClick={(e) => {
                         e.preventDefault();
-                        setCurrentPage(page);
+                        if (currentPage > 1) setCurrentPage(currentPage - 1);
                       }}
-                    >
-                      {page}
-                    </PaginationLink>
+                    />
                   </PaginationItem>
-                ))}
-                
-                <PaginationItem>
-                  <PaginationNext 
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                    }}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+                  
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <PaginationItem key={page}>
+                      <PaginationLink 
+                        href="#"
+                        isActive={currentPage === page}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(page);
+                        }}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </div>
       </Card>
       
@@ -497,4 +537,8 @@ export default function Transactions() {
       />
     </PageTemplate>
   );
+}
+
+function format(date: Date, format: string): string {
+  return date.toISOString().split('T')[0]; // Simple format as YYYY-MM-DD
 }
