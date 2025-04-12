@@ -81,3 +81,24 @@ export type SavingsGoal = DbSavingsGoal & {
   category_name?: string;
   progress_percentage?: number;
 };
+
+// Transaction filter types
+export interface TransactionFilter {
+  startDate?: string;
+  endDate?: string;
+  categoryId?: string;
+  accountId?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  searchTerm?: string;
+  status?: string;
+  isFlagged?: boolean;
+}
+
+// Financial summary types
+export interface FinancialSummary {
+  totalTransactions: number;
+  totalIncome: number;
+  totalExpenses: number;
+  averageTransaction: number;
+}

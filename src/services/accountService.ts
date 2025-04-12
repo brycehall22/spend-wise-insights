@@ -1,7 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Account } from "@/types/database.types";
-import { mapDbAccountToAccount } from "@/types/supabase";
+import { mapDbAccountToAccount, transformResponse, transformSingleResponse } from "@/types/supabase";
 
 export const getAccounts = async (): Promise<Account[]> => {
   // Get the current user's ID from the session
@@ -12,30 +11,28 @@ export const getAccounts = async (): Promise<Account[]> => {
     throw new Error('User must be logged in to fetch accounts');
   }
   
-  const { data, error } = await supabase
+  const response = await supabase
     .from('accounts')
     .select('*')
     .eq('user_id', userId)
     .order('account_name', { ascending: true });
   
-  if (error) throw error;
-  
-  return data.map(mapDbAccountToAccount);
+  return transformResponse('accounts', response);
 };
 
 export const getAccountById = async (accountId: string): Promise<Account | null> => {
-  const { data, error } = await supabase
+  const response = await supabase
     .from('accounts')
     .select('*')
     .eq('account_id', accountId)
     .single();
   
-  if (error) {
-    if (error.code === 'PGRST116') return null; // Not found
-    throw error;
+  if (response.error) {
+    if (response.error.code === 'PGRST116') return null; // Not found
+    throw response.error;
   }
   
-  return mapDbAccountToAccount(data);
+  return response.data;
 };
 
 export const createAccount = async (account: Omit<Account, 'account_id' | 'created_at' | 'updated_at'>): Promise<Account> => {

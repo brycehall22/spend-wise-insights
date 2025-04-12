@@ -1,301 +1,336 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { transformResponse, transformSingleResponse } from "@/types/supabase";
-import { Transaction } from "@/types/database.types";
+import { FinancialSummary, Transaction, TransactionFilter } from "@/types/database.types";
 
-interface TransactionFilter {
-  startDate?: Date;
-  endDate?: Date;
-  categoryId?: string;
-  accountId?: string;
-  minAmount?: number;
-  maxAmount?: number;
-  searchTerm?: string;
-  sortBy?: string;
-  sortDirection?: 'asc' | 'desc';
-  page?: number;
-  pageSize?: number;
-}
+// Helper to build filter conditions
+const buildFilterQuery = (query: any, filter: TransactionFilter) => {
+  let filteredQuery = query;
+  
+  if (filter.startDate) {
+    filteredQuery = filteredQuery.gte('transaction_date', filter.startDate);
+  }
+  
+  if (filter.endDate) {
+    filteredQuery = filteredQuery.lte('transaction_date', filter.endDate);
+  }
+  
+  if (filter.categoryId) {
+    filteredQuery = filteredQuery.eq('category_id', filter.categoryId);
+  }
+  
+  if (filter.accountId) {
+    filteredQuery = filteredQuery.eq('account_id', filter.accountId);
+  }
+  
+  if (filter.minAmount !== undefined) {
+    filteredQuery = filteredQuery.gte('amount', filter.minAmount);
+  }
+  
+  if (filter.maxAmount !== undefined) {
+    filteredQuery = filteredQuery.lte('amount', filter.maxAmount);
+  }
+  
+  if (filter.status) {
+    filteredQuery = filteredQuery.eq('status', filter.status);
+  }
+  
+  if (filter.isFlagged !== undefined) {
+    filteredQuery = filteredQuery.eq('is_flagged', filter.isFlagged);
+  }
+  
+  if (filter.searchTerm) {
+    filteredQuery = filteredQuery.or(`description.ilike.%${filter.searchTerm}%,merchant.ilike.%${filter.searchTerm}%`);
+  }
+  
+  return filteredQuery;
+};
 
-export async function getTransactions(filters: TransactionFilter = {}) {
-  try {
-    const { 
-      startDate, 
-      endDate, 
-      categoryId, 
-      accountId, 
-      minAmount, 
-      maxAmount,
-      searchTerm,
-      sortBy = 'transaction_date',
-      sortDirection = 'desc',
-      page = 1,
-      pageSize = 10
-    } = filters;
+export const getTransactions = async (
+  page: number = 1, 
+  pageSize: number = 10,
+  filter: TransactionFilter = {},
+  sortBy: string = 'transaction_date',
+  sortOrder: 'asc' | 'desc' = 'desc'
+): Promise<{
+  transactions: Transaction[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to fetch transactions');
+  }
+  
+  // Calculate range for pagination
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  
+  // Build the query with filters
+  let query = supabase
+    .from('transactions')
+    .select('*, categories:category_id(name), accounts:account_id(account_name)', { count: 'exact' })
+    .eq('user_id', userId)
+    .order(sortBy, { ascending: sortOrder === 'asc' })
+    .range(from, to);
+  
+  // Apply filters
+  query = buildFilterQuery(query, filter);
+  
+  const { data, error, count } = await query;
+  
+  if (error) throw error;
+  
+  // Transform the data to match the Transaction type
+  const transactions = data.map((item: any) => ({
+    ...item,
+    category_name: item.categories?.name,
+    account_name: item.accounts?.account_name,
+  }));
+  
+  const totalPages = Math.ceil((count || 0) / pageSize);
+  
+  return {
+    transactions,
+    pagination: {
+      page,
+      pageSize,
+      totalCount: count || 0,
+      totalPages,
+    },
+  };
+};
 
-    const offset = (page - 1) * pageSize;
-    
-    let query = supabase
-      .from('transactions')
-      .select(`
-        *,
-        categories:category_id (name),
-        accounts:account_id (account_name)
-      `)
-      .order(sortBy, { ascending: sortDirection === 'asc' })
-      .limit(pageSize)
-      .range(offset, offset + pageSize - 1);
-
-    // Apply filters
-    if (startDate) {
-      query = query.gte('transaction_date', startDate.toISOString().split('T')[0]);
-    }
-    
-    if (endDate) {
-      query = query.lte('transaction_date', endDate.toISOString().split('T')[0]);
-    }
-    
-    if (categoryId) {
-      query = query.eq('category_id', categoryId);
-    }
-    
-    if (accountId) {
-      query = query.eq('account_id', accountId);
-    }
-    
-    if (minAmount !== undefined) {
-      query = query.gte('amount', minAmount);
-    }
-    
-    if (maxAmount !== undefined) {
-      query = query.lte('amount', maxAmount);
-    }
-    
-    if (searchTerm) {
-      query = query.or(`description.ilike.%${searchTerm}%,merchant.ilike.%${searchTerm}%`);
-    }
-    
-    const { data, error, count } = await query;
-    
-    if (error) throw error;
-    
-    // Transform the data to include category and account names
-    const transformedData: Transaction[] = data.map((transaction: any) => {
-      return {
-        ...transaction,
-        category_name: transaction.categories?.name || null,
-        account_name: transaction.accounts?.account_name || null
-      };
-    });
-    
-    return {
-      transactions: transformedData,
-      pagination: {
-        page,
-        pageSize,
-        totalCount: count || 0,
-        totalPages: count ? Math.ceil(count / pageSize) : 0
-      }
-    };
-  } catch (error) {
-    console.error('Error fetching transactions:', error);
+export const getTransactionById = async (transactionId: string): Promise<Transaction | null> => {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*, categories:category_id(name), accounts:account_id(account_name)')
+    .eq('transaction_id', transactionId)
+    .single();
+  
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Not found
     throw error;
   }
-}
+  
+  // Transform to Transaction type
+  return {
+    ...data,
+    category_name: data.categories?.name,
+    account_name: data.accounts?.account_name,
+  };
+};
 
-export async function getTransaction(transactionId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        categories:category_id (name),
-        accounts:account_id (account_name)
-      `)
-      .eq('transaction_id', transactionId)
-      .single();
-    
-    if (error) throw error;
-    
-    if (!data) return null;
-    
-    return {
-      ...data,
-      category_name: data.categories?.name || null,
-      account_name: data.accounts?.account_name || null
-    } as Transaction;
-  } catch (error) {
-    console.error('Error fetching transaction:', error);
-    throw error;
+export const createTransaction = async (transaction: Omit<Transaction, "transaction_id" | "created_at" | "updated_at">): Promise<Transaction> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to create a transaction');
   }
-}
+  
+  // Ensure user_id is set
+  const transactionWithUserId = {
+    ...transaction,
+    user_id: userId
+  };
+  
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert(transactionWithUserId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  
+  return data;
+};
 
-export async function createTransaction(transaction: Omit<Transaction, 'transaction_id' | 'created_at' | 'updated_at'>) {
-  try {
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert(transaction)
-      .select();
-    
-    if (error) throw error;
-    
-    return data[0] as Transaction;
-  } catch (error) {
-    console.error('Error creating transaction:', error);
-    throw error;
-  }
-}
+export const updateTransaction = async (transaction: Partial<Transaction> & { transaction_id: string }): Promise<Transaction> => {
+  const { data, error } = await supabase
+    .from('transactions')
+    .update(transaction)
+    .eq('transaction_id', transaction.transaction_id)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  
+  return data;
+};
 
-export async function updateTransaction(
-  transactionId: string, 
-  updates: Partial<Omit<Transaction, 'transaction_id' | 'created_at' | 'updated_at'>>
-) {
-  try {
-    const { data, error } = await supabase
-      .from('transactions')
-      .update(updates)
-      .eq('transaction_id', transactionId)
-      .select();
-    
-    if (error) throw error;
-    
-    return data[0] as Transaction;
-  } catch (error) {
-    console.error('Error updating transaction:', error);
-    throw error;
-  }
-}
+export const deleteTransaction = async (transactionId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('transaction_id', transactionId);
+  
+  if (error) throw error;
+};
 
-export async function deleteTransaction(transactionId: string) {
-  try {
-    const { error } = await supabase
-      .from('transactions')
-      .delete()
-      .eq('transaction_id', transactionId);
-    
-    if (error) throw error;
-    
-    return true;
-  } catch (error) {
-    console.error('Error deleting transaction:', error);
-    throw error;
-  }
-}
+export const batchDeleteTransactions = async (transactionIds: string[]): Promise<void> => {
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .in('transaction_id', transactionIds);
+  
+  if (error) throw error;
+};
 
-export async function flagTransaction(transactionId: string, isFlagged: boolean) {
-  try {
-    const { data, error } = await supabase
-      .from('transactions')
-      .update({ is_flagged: isFlagged })
-      .eq('transaction_id', transactionId)
-      .select();
-    
-    if (error) throw error;
-    
-    return data[0] as Transaction;
-  } catch (error) {
-    console.error('Error flagging transaction:', error);
-    throw error;
-  }
-}
-
-export async function batchUpdateTransactions(
-  transactionIds: string[], 
+export const batchUpdateTransactions = async (
+  transactionIds: string[],
   updates: Partial<Transaction>
-) {
-  // Not directly supported by Supabase, so we need to do it one by one
-  try {
-    const promises = transactionIds.map(id => 
-      supabase
-        .from('transactions')
-        .update(updates)
-        .eq('transaction_id', id)
-    );
-    
-    await Promise.all(promises);
-    
-    return true;
-  } catch (error) {
-    console.error('Error batch updating transactions:', error);
-    throw error;
-  }
-}
+): Promise<void> => {
+  const { error } = await supabase
+    .from('transactions')
+    .update(updates)
+    .in('transaction_id', transactionIds);
+  
+  if (error) throw error;
+};
 
-export async function batchDeleteTransactions(transactionIds: string[]) {
-  try {
-    const { error } = await supabase
-      .from('transactions')
-      .delete()
-      .in('transaction_id', transactionIds);
-    
-    if (error) throw error;
-    
-    return true;
-  } catch (error) {
-    console.error('Error batch deleting transactions:', error);
-    throw error;
-  }
-}
+export const batchUpdateCategory = async (
+  transactionIds: string[],
+  categoryId: string | null
+): Promise<void> => {
+  return batchUpdateTransactions(transactionIds, { category_id: categoryId });
+};
 
-export async function getTransactionStats() {
-  try {
-    const { data: transactions, error } = await supabase
-      .from('transactions')
-      .select('*');
-    
-    if (error) throw error;
-    
-    // Simple stats calculation - will be enhanced later
-    const stats = {
-      totalTransactions: transactions.length,
-      totalIncome: transactions
-        .filter(t => t.amount > 0)
-        .reduce((sum, t) => sum + t.amount, 0),
-      totalExpenses: transactions
-        .filter(t => t.amount < 0)
-        .reduce((sum, t) => sum + Math.abs(t.amount), 0),
-      averageTransaction: transactions.length > 0 
-        ? transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0) / transactions.length
-        : 0
-    };
-    
-    return stats;
-  } catch (error) {
-    console.error('Error fetching transaction stats:', error);
-    throw error;
-  }
-}
+export const flagTransaction = async (transactionId: string, isFlagged: boolean): Promise<Transaction> => {
+  const { data, error } = await supabase
+    .from('transactions')
+    .update({ is_flagged: isFlagged })
+    .eq('transaction_id', transactionId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  
+  return data;
+};
 
-export async function exportTransactions(filters: TransactionFilter = {}) {
-  try {
-    // Use existing function but remove pagination
-    const { transactions } = await getTransactions({
-      ...filters,
-      page: 1,
-      pageSize: 1000 // Get a larger batch for export
-    });
-    
-    // Convert to CSV format
-    const headers = ['Date', 'Description', 'Amount', 'Category', 'Account', 'Status'];
-    const csvRows = [
-      headers.join(',')
-    ];
-    
-    transactions.forEach(t => {
-      const row = [
-        t.transaction_date,
-        `"${t.description.replace(/"/g, '""')}"`, // Escape quotes
-        t.amount,
-        t.category_name || 'Uncategorized',
-        t.account_name || 'Unknown Account',
-        t.status
-      ];
-      csvRows.push(row.join(','));
-    });
-    
-    return csvRows.join('\n');
-  } catch (error) {
-    console.error('Error exporting transactions:', error);
-    throw error;
+export const getFinancialSummary = async (
+  startDate?: string,
+  endDate?: string
+): Promise<FinancialSummary> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to get financial summary');
   }
-}
+  
+  // Start with base query
+  let query = supabase
+    .from('transactions')
+    .select('*, categories:category_id(is_income)')
+    .eq('user_id', userId);
+  
+  // Apply date filters if provided
+  if (startDate) {
+    query = query.gte('transaction_date', startDate);
+  }
+  
+  if (endDate) {
+    query = query.lte('transaction_date', endDate);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) throw error;
+  
+  // Process the transactions to calculate summary
+  let totalIncome = 0;
+  let totalExpenses = 0;
+  
+  data.forEach((transaction: any) => {
+    const amount = transaction.amount;
+    const isIncome = transaction.categories?.is_income || false;
+    
+    if (isIncome) {
+      totalIncome += amount;
+    } else {
+      totalExpenses += Math.abs(amount);
+    }
+  });
+  
+  const totalTransactions = data.length;
+  const averageTransaction = totalTransactions > 0 
+    ? (totalIncome + totalExpenses) / totalTransactions 
+    : 0;
+  
+  return {
+    totalTransactions,
+    totalIncome,
+    totalExpenses,
+    averageTransaction
+  };
+};
+
+export const exportTransactions = async (format: 'csv' | 'json' = 'csv', filter: TransactionFilter = {}): Promise<string> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to export transactions');
+  }
+  
+  // Build the query with filters
+  let query = supabase
+    .from('transactions')
+    .select('*, categories:category_id(name), accounts:account_id(account_name)')
+    .eq('user_id', userId)
+    .order('transaction_date', { ascending: false });
+  
+  // Apply filters
+  query = buildFilterQuery(query, filter);
+  
+  const { data, error } = await query;
+  
+  if (error) throw error;
+  
+  // Transform the data to match the Transaction type
+  const transactions = data.map((item: any) => ({
+    ...item,
+    category_name: item.categories?.name,
+    account_name: item.accounts?.account_name,
+  }));
+  
+  if (format === 'json') {
+    return JSON.stringify(transactions, null, 2);
+  } else {
+    // CSV format
+    const headers = [
+      'Transaction Date',
+      'Description',
+      'Merchant',
+      'Category',
+      'Account',
+      'Amount',
+      'Currency',
+      'Status'
+    ].join(',');
+    
+    const rows = transactions.map((t: Transaction) => [
+      t.transaction_date,
+      `"${t.description.replace(/"/g, '""')}"`,
+      `"${t.merchant.replace(/"/g, '""')}"`,
+      `"${t.category_name || 'Uncategorized'}"`,
+      `"${t.account_name || ''}"`,
+      t.amount,
+      t.currency,
+      t.status
+    ].join(','));
+    
+    return [headers, ...rows].join('\n');
+  }
+};

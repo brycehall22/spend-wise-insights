@@ -1,192 +1,135 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { transformResponse, transformSingleResponse } from "@/types/supabase";
-import { Category } from "@/types/database.types";
+import { Category, DbCategory } from "@/types/database.types";
+import { transformResponse, transformSingleCategoryResponse } from "@/types/supabase";
 
-export async function getCategories(includeIncome: boolean = true) {
-  try {
-    let query = supabase
-      .from('categories')
-      .select('*');
+export const getCategories = async (includeIncome: boolean = true): Promise<DbCategory[]> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to fetch categories');
+  }
+  
+  let query = supabase
+    .from('categories')
+    .select('*')
+    .eq('user_id', userId);
+  
+  if (!includeIncome) {
+    query = query.eq('is_income', false);
+  }
+    
+  const { data, error } = await query.order('name', { ascending: true });
+  
+  if (error) throw error;
+  
+  return data;
+};
+
+export const getCategoryById = async (categoryId: string): Promise<Category | null> => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('category_id', categoryId)
+    .single();
+  
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Not found
+    throw error;
+  }
+  
+  return data;
+};
+
+export const createCategory = async (category: Omit<Category, "category_id" | "created_at" | "updated_at">): Promise<Category> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to create a category');
+  }
+  
+  // Ensure user_id is set
+  const categoryWithUserId = {
+    ...category,
+    user_id: userId
+  };
+  
+  const { data, error } = await supabase
+    .from('categories')
+    .insert(categoryWithUserId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  
+  return data;
+};
+
+export const updateCategory = async (category: Partial<Category> & { category_id: string }): Promise<Category> => {
+  const { data, error } = await supabase
+    .from('categories')
+    .update(category)
+    .eq('category_id', category.category_id)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  
+  return data;
+};
+
+export const deleteCategory = async (categoryId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('category_id', categoryId);
+  
+  if (error) throw error;
+};
+
+export const getCategoryStats = async (): Promise<{ name: string; amount: number }[]> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to fetch category statistics');
+  }
+  
+  // This is a simplified example - in a real app you might want to use a more complex query
+  const { data, error } = await supabase
+    .from('transactions')
+    .select(`
+      amount,
+      categories (name, category_id)
+    `)
+    .eq('user_id', userId)
+    .eq('categories.is_income', false)
+    .gte('transaction_date', new Date(new Date().setDate(1)).toISOString())
+    .lt('transaction_date', new Date(new Date().setMonth(new Date().getMonth() + 1, 0)).toISOString());
+  
+  if (error) throw error;
+  
+  // Process the data to group by category
+  const categoryStats: Record<string, { name: string; amount: number }> = {};
+  
+  data.forEach((transaction: any) => {
+    if (transaction.categories) {
+      const categoryId = transaction.categories.category_id;
+      const categoryName = transaction.categories.name;
+      const amount = Math.abs(transaction.amount);
       
-    if (!includeIncome) {
-      query = query.eq('is_income', false);
-    }
-    
-    const response = await query.order('name');
-    return transformResponse('categories', response);
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    throw error;
-  }
-}
-
-export async function getIncomeCategories() {
-  try {
-    const response = await supabase
-      .from('categories')
-      .select('*')
-      .eq('is_income', true)
-      .order('name');
-    
-    return transformResponse('categories', response);
-  } catch (error) {
-    console.error('Error fetching income categories:', error);
-    throw error;
-  }
-}
-
-export async function getExpenseCategories() {
-  try {
-    const response = await supabase
-      .from('categories')
-      .select('*')
-      .eq('is_income', false)
-      .order('name');
-    
-    return transformResponse('categories', response);
-  } catch (error) {
-    console.error('Error fetching expense categories:', error);
-    throw error;
-  }
-}
-
-export async function getCategory(categoryId: string) {
-  try {
-    const response = await supabase
-      .from('categories')
-      .select('*')
-      .eq('category_id', categoryId)
-      .single();
-    
-    return transformSingleResponse('categories', response);
-  } catch (error) {
-    console.error('Error fetching category:', error);
-    throw error;
-  }
-}
-
-export async function createCategory(category: Omit<Category, "category_id" | "created_at" | "updated_at">) {
-  try {
-    // Get the user's ID from the current session
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-    
-    // Make sure user_id is included in the category
-    const categoryWithUserId = {
-      ...category,
-      user_id: user.id
-    };
-    
-    const response = await supabase
-      .from('categories')
-      .insert(categoryWithUserId)
-      .select();
-    
-    return transformSingleResponse('categories', response);
-  } catch (error) {
-    console.error('Error creating category:', error);
-    throw error;
-  }
-}
-
-export async function updateCategory(categoryId: string, updates: Partial<Category>) {
-  try {
-    const response = await supabase
-      .from('categories')
-      .update(updates)
-      .eq('category_id', categoryId)
-      .select();
-    
-    return transformSingleResponse('categories', response);
-  } catch (error) {
-    console.error('Error updating category:', error);
-    throw error;
-  }
-}
-
-export async function deleteCategory(categoryId: string) {
-  try {
-    const { error } = await supabase
-      .from('categories')
-      .delete()
-      .eq('category_id', categoryId);
-    
-    if (error) throw error;
-    
-    return true;
-  } catch (error) {
-    console.error('Error deleting category:', error);
-    throw error;
-  }
-}
-
-export async function getCategoryWithTransactionCount(categoryId: string) {
-  try {
-    // First get the category
-    const category = await getCategory(categoryId);
-    
-    if (!category) {
-      return null;
-    }
-    
-    // Count transactions with this category
-    const { count, error } = await supabase
-      .from('transactions')
-      .select('*', { count: 'exact' })
-      .eq('category_id', categoryId);
-    
-    if (error) throw error;
-    
-    return { 
-      ...category, 
-      transactionCount: count || 0 
-    };
-  } catch (error) {
-    console.error('Error fetching category with transaction count:', error);
-    throw error;
-  }
-}
-
-export async function getTransactionCountsByCategory() {
-  try {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select(`
-        category_id,
-        categories:category_id (name)
-      `);
-    
-    if (error) throw error;
-    
-    // Count transactions by category
-    const counts: Record<string, { 
-      category_id: string, 
-      name: string, 
-      count: number 
-    }> = {};
-    
-    data.forEach((transaction: any) => {
-      const categoryId = transaction.category_id || 'uncategorized';
-      const name = transaction.categories?.name || 'Uncategorized';
-      
-      if (!counts[categoryId]) {
-        counts[categoryId] = {
-          category_id: categoryId,
-          name,
-          count: 0
-        };
+      if (!categoryStats[categoryId]) {
+        categoryStats[categoryId] = { name: categoryName, amount: 0 };
       }
       
-      counts[categoryId].count++;
-    });
-    
-    return Object.values(counts);
-  } catch (error) {
-    console.error('Error fetching transaction counts by category:', error);
-    throw error;
-  }
-}
+      categoryStats[categoryId].amount += amount;
+    }
+  });
+  
+  return Object.values(categoryStats);
+};

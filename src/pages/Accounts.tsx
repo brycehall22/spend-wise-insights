@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 export default function Accounts() {
   const { data: accounts, isLoading, error } = useQuery({
     queryKey: ['accounts'],
-    queryFn: getAccounts,
+    queryFn: () => getAccounts(),
   });
 
   const handleAddAccount = () => {
@@ -22,7 +22,7 @@ export default function Accounts() {
   return (
     <PageTemplate
       title="Accounts"
-      description="Manage your financial accounts"
+      subtitle="Manage your financial accounts"
       action={
         <Button onClick={handleAddAccount}>
           <Plus className="mr-2 h-4 w-4" />

@@ -2,7 +2,6 @@
 import { PostgrestResponse } from '@supabase/supabase-js';
 import { 
   DbAccount, 
-  Account,
   DbCategory, 
   Category,
   DbTransaction, 
@@ -17,23 +16,23 @@ import {
 export type DbEntityMap = {
   accounts: {
     Row: DbAccount;
-    Entity: Account;
+    Entity: DbAccount;
   };
   categories: {
     Row: DbCategory;
-    Entity: Category;
+    Entity: DbCategory;
   };
   transactions: {
     Row: DbTransaction;
-    Entity: Transaction;
+    Entity: DbTransaction;
   };
   budgets: {
     Row: DbBudget;
-    Entity: Budget;
+    Entity: DbBudget;
   };
   savings_goals: {
     Row: DbSavingsGoal;
-    Entity: SavingsGoal;
+    Entity: DbSavingsGoal;
   };
 };
 
@@ -53,4 +52,17 @@ export function transformSingleResponse<T extends keyof DbEntityMap>(
 ): DbEntityMap[T]['Entity'] | null {
   if (response.error) throw new Error(response.error.message);
   return (response.data?.[0] as unknown as DbEntityMap[T]['Entity']) || null;
+}
+
+// Account mapping functions
+export function mapDbAccountToAccount(dbAccount: DbAccount) {
+  return dbAccount;
+}
+
+// Helper function to transform a single category response
+export function transformSingleCategoryResponse(
+  response: PostgrestResponse<DbCategory>
+): Category | null {
+  if (response.error) throw new Error(response.error.message);
+  return (response.data?.[0] as unknown as Category) || null;
 }
