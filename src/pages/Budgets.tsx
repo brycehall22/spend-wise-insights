@@ -78,7 +78,7 @@ export default function Budgets() {
         
         <BudgetSummary month={selectedMonth || new Date()} />
 
-        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>

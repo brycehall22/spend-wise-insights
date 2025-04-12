@@ -25,6 +25,7 @@ export default function Analytics() {
   const [dateRange, setDateRange] = useState("6m");
   const [comparisonType, setComparisonType] = useState("month");
   const [exportFormat, setExportFormat] = useState("pdf");
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Calculate date range for display
   const getDateRangeDisplay = () => {
@@ -133,7 +134,7 @@ export default function Analytics() {
       </div>
       
       {/* Main analytics tabs */}
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-4 mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="spending">Spending</TabsTrigger>

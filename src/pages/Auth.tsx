@@ -81,7 +81,7 @@ export default function Auth() {
       email: "",
       password: "",
       confirmPassword: "",
-      terms: false,
+      terms: false as unknown as true, // This is where the error is happening, let's fix it
     },
   });
 
@@ -233,7 +233,7 @@ export default function Auth() {
 
         <Card className="border-none shadow-lg">
           <CardHeader className="pb-2">
-            <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Sign In</TabsTrigger>
                 <TabsTrigger value="register">Create Account</TabsTrigger>
