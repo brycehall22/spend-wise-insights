@@ -95,7 +95,7 @@ export const getTransactions = async (
       account_id: item.account_id,
       category_id: item.category_id,
       amount: item.amount,
-      currency: item.currency,
+      currency: item.currency || (item.accounts?.currency || ''),
       description: item.description,
       merchant: item.merchant,
       transaction_date: item.transaction_date,
@@ -185,7 +185,7 @@ export const createTransaction = async (transaction: Omit<DbTransaction, "transa
   
   if (error) throw error;
   
-  return data;
+  return data as Transaction;
 };
 
 export const updateTransaction = async (transaction: Partial<DbTransaction> & { transaction_id: string }): Promise<Transaction> => {
@@ -198,7 +198,7 @@ export const updateTransaction = async (transaction: Partial<DbTransaction> & { 
   
   if (error) throw error;
   
-  return data;
+  return data as Transaction;
 };
 
 export const deleteTransaction = async (transactionId: string): Promise<void> => {
@@ -223,7 +223,13 @@ export const flagTransaction = async (transactionId: string, isFlagged: boolean)
   
   if (error) throw error;
   
-  return data as Transaction;
+  // Explicitly cast and handle the is_flagged field
+  const transaction: Transaction = {
+    ...data,
+    is_flagged: data.is_flagged || false
+  } as Transaction;
+  
+  return transaction;
 };
 
 export const batchDeleteTransactions = async (transactionIds: string[]): Promise<void> => {
