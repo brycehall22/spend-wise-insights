@@ -54,9 +54,23 @@ export const getCategoryById = async (categoryId: string): Promise<Category | nu
 };
 
 export const createCategory = async (category: Omit<Category, 'category_id' | 'created_at' | 'updated_at'>): Promise<Category> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to create a category');
+  }
+  
+  // Ensure user_id is set
+  const categoryWithUserId = {
+    ...category,
+    user_id: userId
+  };
+  
   const { data, error } = await supabase
     .from('categories')
-    .insert(category)
+    .insert(categoryWithUserId)
     .select()
     .single();
   

@@ -28,7 +28,7 @@ export interface Account {
 
 export interface Category {
   category_id: string;
-  user_id?: string;
+  user_id: string; // Now required, not optional
   name: string;
   parent_category_id: string | null;
   color?: string;

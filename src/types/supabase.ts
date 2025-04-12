@@ -1,5 +1,6 @@
 
 import { Database } from '@/integrations/supabase/types';
+import { Account, Category, Transaction } from '@/types/database.types';
 
 // Type aliases from the generated Supabase types
 export type DbAccount = Database['public']['Tables']['accounts']['Row'];
