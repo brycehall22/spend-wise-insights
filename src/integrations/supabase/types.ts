@@ -9,7 +9,234 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      accounts: {
+        Row: {
+          account_id: string
+          account_name: string
+          account_type: string
+          balance: number
+          created_at: string
+          currency: string
+          is_active: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string
+          account_name: string
+          account_type: string
+          balance?: number
+          created_at?: string
+          currency?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          account_name?: string
+          account_type?: string
+          balance?: number
+          created_at?: string
+          currency?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      budgets: {
+        Row: {
+          amount: number
+          budget_id: string
+          category_id: string | null
+          created_at: string
+          month: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          budget_id?: string
+          category_id?: string | null
+          created_at?: string
+          month: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          budget_id?: string
+          category_id?: string | null
+          created_at?: string
+          month?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["category_id"]
+          },
+        ]
+      }
+      categories: {
+        Row: {
+          category_id: string
+          color: string | null
+          created_at: string
+          icon: string | null
+          is_income: boolean
+          name: string
+          parent_category_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id?: string
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          is_income?: boolean
+          name: string
+          parent_category_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          is_income?: boolean
+          name?: string
+          parent_category_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_category_id_fkey"
+            columns: ["parent_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["category_id"]
+          },
+        ]
+      }
+      savings_goals: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          current_amount: number
+          goal_id: string
+          is_completed: boolean
+          name: string
+          start_date: string
+          target_amount: number
+          target_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          current_amount?: number
+          goal_id?: string
+          is_completed?: boolean
+          name: string
+          start_date: string
+          target_amount: number
+          target_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          current_amount?: number
+          goal_id?: string
+          is_completed?: boolean
+          name?: string
+          start_date?: string
+          target_amount?: number
+          target_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "savings_goals_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["category_id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          account_id: string
+          amount: number
+          category_id: string | null
+          created_at: string
+          currency: string
+          description: string
+          merchant: string
+          status: string
+          transaction_date: string
+          transaction_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          currency?: string
+          description: string
+          merchant: string
+          status?: string
+          transaction_date: string
+          transaction_id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string
+          merchant?: string
+          status?: string
+          transaction_date?: string
+          transaction_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["category_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
