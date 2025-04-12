@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import PageTemplate from './PageTemplate';
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +18,7 @@ import {
 import TransactionFilters from '@/components/transactions/TransactionFilters';
 import AddTransactionDialog from '@/components/transactions/AddTransactionDialog';
 import BatchActionsBar from '@/components/transactions/BatchActionsBar';
-import { TransactionFilter } from '@/types/database.types';
+import { TransactionFilter, Category, DbAccount } from '@/types/database.types';
 import { 
   getTransactions, 
   deleteTransaction, 
@@ -296,9 +297,9 @@ export default function Transactions() {
       {isFilterOpen && (
         <Card className="mb-6 p-4">
           <TransactionFilters 
-            onApplyFilters={handleFilterChange} 
+            onApplyFilters={handleFilterChange}
             initialFilters={filters}
-            categories={(categories || []) as Category[]} // Fixed type casting here
+            categories={(categories || []) as Category[]}
             accounts={accounts || []}
           />
         </Card>

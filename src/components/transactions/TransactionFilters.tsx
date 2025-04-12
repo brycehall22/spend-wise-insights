@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { TransactionFilter } from "@/types/database.types";
 
 interface Category {
   category_id: string;
@@ -38,10 +38,11 @@ interface Account {
 }
 
 interface TransactionFiltersProps {
-  onFilterChange: (filters: FilterState) => void;
+  onApplyFilters: (filters: FilterState) => void;
+  initialFilters: TransactionFilter;
   categories: Category[];
   accounts: Account[];
-  activeFilters: number;
+  activeFilters?: number;
 }
 
 export interface FilterState {
@@ -77,10 +78,11 @@ const defaultFilters: FilterState = {
 };
 
 export const TransactionFilters: React.FC<TransactionFiltersProps> = ({
-  onFilterChange,
+  onApplyFilters,
+  initialFilters,
   categories,
   accounts,
-  activeFilters,
+  activeFilters = 0,
 }) => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [searchValue, setSearchValue] = useState('');
@@ -89,7 +91,7 @@ export const TransactionFilters: React.FC<TransactionFiltersProps> = ({
   const updateFilters = (newFilters: Partial<FilterState>) => {
     const updated = { ...filters, ...newFilters };
     setFilters(updated);
-    onFilterChange(updated);
+    onApplyFilters(updated);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -100,7 +102,7 @@ export const TransactionFilters: React.FC<TransactionFiltersProps> = ({
   const handleReset = () => {
     setFilters(defaultFilters);
     setSearchValue('');
-    onFilterChange(defaultFilters);
+    onApplyFilters(defaultFilters);
   };
 
   const handleDatePreset = (preset: 'today' | 'yesterday' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisYear') => {

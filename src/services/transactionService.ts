@@ -82,11 +82,12 @@ export const getTransactions = async (
   
   // Format the results
   const transactions: Transaction[] = (data || []).map(item => {
-    const transaction: any = {
+    const transaction: Transaction = {
       ...item,
       category_name: item.categories?.name,
       account_name: item.accounts?.account_name,
-    };
+      is_flagged: item.is_flagged || false
+    } as Transaction;
     
     // Remove nested objects
     delete transaction.categories;
@@ -187,6 +188,7 @@ export const deleteTransaction = async (transactionId: string): Promise<void> =>
 };
 
 export const flagTransaction = async (transactionId: string, isFlagged: boolean): Promise<Transaction> => {
+  // Create a properly typed update object
   const updateData: Partial<DbTransaction> = { is_flagged: isFlagged };
   
   const { data, error } = await supabase
@@ -198,7 +200,7 @@ export const flagTransaction = async (transactionId: string, isFlagged: boolean)
   
   if (error) throw error;
   
-  return data;
+  return data as Transaction;
 };
 
 export const batchDeleteTransactions = async (transactionIds: string[]): Promise<void> => {
