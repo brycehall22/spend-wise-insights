@@ -25,7 +25,11 @@ export type DbCategory = {
   updated_at: string;
 };
 
-export type Category = DbCategory;
+export type Category = Omit<DbCategory, 'parent_category_id' | 'color' | 'icon'> & {
+  parent_category_id: string | null;
+  color: string | null;
+  icon: string | null;
+};
 
 export type DbTransaction = {
   transaction_id: string;

@@ -1,65 +1,24 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { FinancialSummary, Transaction, TransactionFilter } from "@/types/database.types";
+import { DbTransaction, Transaction, TransactionFilter, FinancialSummary } from "@/types/database.types";
 
-// Helper to build filter conditions
-const buildFilterQuery = (query: any, filter: TransactionFilter) => {
-  let filteredQuery = query;
-  
-  if (filter.startDate) {
-    filteredQuery = filteredQuery.gte('transaction_date', filter.startDate);
-  }
-  
-  if (filter.endDate) {
-    filteredQuery = filteredQuery.lte('transaction_date', filter.endDate);
-  }
-  
-  if (filter.categoryId) {
-    filteredQuery = filteredQuery.eq('category_id', filter.categoryId);
-  }
-  
-  if (filter.accountId) {
-    filteredQuery = filteredQuery.eq('account_id', filter.accountId);
-  }
-  
-  if (filter.minAmount !== undefined) {
-    filteredQuery = filteredQuery.gte('amount', filter.minAmount);
-  }
-  
-  if (filter.maxAmount !== undefined) {
-    filteredQuery = filteredQuery.lte('amount', filter.maxAmount);
-  }
-  
-  if (filter.status) {
-    filteredQuery = filteredQuery.eq('status', filter.status);
-  }
-  
-  if (filter.isFlagged !== undefined) {
-    filteredQuery = filteredQuery.eq('is_flagged', filter.isFlagged);
-  }
-  
-  if (filter.searchTerm) {
-    filteredQuery = filteredQuery.or(`description.ilike.%${filter.searchTerm}%,merchant.ilike.%${filter.searchTerm}%`);
-  }
-  
-  return filteredQuery;
-};
+interface PaginationResult {
+  totalCount: number;
+  totalPages: number;
+}
+
+interface TransactionsResponse {
+  transactions: Transaction[];
+  pagination: PaginationResult;
+}
 
 export const getTransactions = async (
   page: number = 1, 
-  pageSize: number = 10,
-  filter: TransactionFilter = {},
+  pageSize: number = 10, 
+  filters: TransactionFilter = {},
   sortBy: string = 'transaction_date',
   sortOrder: 'asc' | 'desc' = 'desc'
-): Promise<{
-  transactions: Transaction[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    totalCount: number;
-    totalPages: number;
-  };
-}> => {
+): Promise<TransactionsResponse> => {
   // Get the current user's ID from the session
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user.id;
@@ -67,50 +26,96 @@ export const getTransactions = async (
   if (!userId) {
     throw new Error('User must be logged in to fetch transactions');
   }
+
+  // Calculate offset for pagination
+  const offset = (page - 1) * pageSize;
   
-  // Calculate range for pagination
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
-  
-  // Build the query with filters
+  // Start building the query
   let query = supabase
     .from('transactions')
-    .select('*, categories:category_id(name), accounts:account_id(account_name)', { count: 'exact' })
-    .eq('user_id', userId)
-    .order(sortBy, { ascending: sortOrder === 'asc' })
-    .range(from, to);
-  
-  // Apply filters
-  query = buildFilterQuery(query, filter);
-  
+    .select(`
+      *,
+      categories (name),
+      accounts (account_name, currency)
+    `, { count: 'exact' })
+    .eq('user_id', userId);
+
+  // Apply filters if provided
+  if (filters.startDate) {
+    query = query.gte('transaction_date', filters.startDate);
+  }
+  if (filters.endDate) {
+    query = query.lte('transaction_date', filters.endDate);
+  }
+  if (filters.categoryId) {
+    query = query.eq('category_id', filters.categoryId);
+  }
+  if (filters.accountId) {
+    query = query.eq('account_id', filters.accountId);
+  }
+  if (filters.minAmount !== undefined) {
+    query = query.gte('amount', filters.minAmount);
+  }
+  if (filters.maxAmount !== undefined) {
+    query = query.lte('amount', filters.maxAmount);
+  }
+  if (filters.searchTerm) {
+    query = query.or(`description.ilike.%${filters.searchTerm}%,merchant.ilike.%${filters.searchTerm}%`);
+  }
+  if (filters.status) {
+    query = query.eq('status', filters.status);
+  }
+  if (filters.isFlagged !== undefined) {
+    query = query.eq('is_flagged', filters.isFlagged);
+  }
+
+  // Apply sorting
+  const dbSortBy = sortBy === 'date' ? 'transaction_date' : sortBy;
+  query = query.order(dbSortBy, { ascending: sortOrder === 'asc' });
+
+  // Apply pagination
+  query = query.range(offset, offset + pageSize - 1);
+
+  // Execute the query
   const { data, error, count } = await query;
   
   if (error) throw error;
   
-  // Transform the data to match the Transaction type
-  const transactions = data.map((item: any) => ({
-    ...item,
-    category_name: item.categories?.name,
-    account_name: item.accounts?.account_name,
-  }));
+  // Format the results
+  const transactions: Transaction[] = (data || []).map(item => {
+    const transaction: any = {
+      ...item,
+      category_name: item.categories?.name,
+      account_name: item.accounts?.account_name,
+    };
+    
+    // Remove nested objects
+    delete transaction.categories;
+    delete transaction.accounts;
+    
+    return transaction;
+  });
   
+  // Calculate total pages
   const totalPages = Math.ceil((count || 0) / pageSize);
   
   return {
     transactions,
     pagination: {
-      page,
-      pageSize,
       totalCount: count || 0,
-      totalPages,
-    },
+      totalPages
+    }
   };
 };
 
 export const getTransactionById = async (transactionId: string): Promise<Transaction | null> => {
   const { data, error } = await supabase
     .from('transactions')
-    .select('*, categories:category_id(name), accounts:account_id(account_name)')
+    .select(`
+      *,
+      categories (name),
+      accounts (account_name)
+    `)
     .eq('transaction_id', transactionId)
     .single();
   
@@ -119,15 +124,22 @@ export const getTransactionById = async (transactionId: string): Promise<Transac
     throw error;
   }
   
-  // Transform to Transaction type
-  return {
+  if (!data) return null;
+  
+  const transaction: any = {
     ...data,
     category_name: data.categories?.name,
     account_name: data.accounts?.account_name,
   };
+  
+  // Remove nested objects
+  delete transaction.categories;
+  delete transaction.accounts;
+  
+  return transaction;
 };
 
-export const createTransaction = async (transaction: Omit<Transaction, "transaction_id" | "created_at" | "updated_at">): Promise<Transaction> => {
+export const createTransaction = async (transaction: Omit<DbTransaction, "transaction_id" | "created_at" | "updated_at">): Promise<Transaction> => {
   // Get the current user's ID from the session
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user.id;
@@ -153,7 +165,7 @@ export const createTransaction = async (transaction: Omit<Transaction, "transact
   return data;
 };
 
-export const updateTransaction = async (transaction: Partial<Transaction> & { transaction_id: string }): Promise<Transaction> => {
+export const updateTransaction = async (transaction: Partial<DbTransaction> & { transaction_id: string }): Promise<Transaction> => {
   const { data, error } = await supabase
     .from('transactions')
     .update(transaction)
@@ -175,34 +187,6 @@ export const deleteTransaction = async (transactionId: string): Promise<void> =>
   if (error) throw error;
 };
 
-export const batchDeleteTransactions = async (transactionIds: string[]): Promise<void> => {
-  const { error } = await supabase
-    .from('transactions')
-    .delete()
-    .in('transaction_id', transactionIds);
-  
-  if (error) throw error;
-};
-
-export const batchUpdateTransactions = async (
-  transactionIds: string[],
-  updates: Partial<Transaction>
-): Promise<void> => {
-  const { error } = await supabase
-    .from('transactions')
-    .update(updates)
-    .in('transaction_id', transactionIds);
-  
-  if (error) throw error;
-};
-
-export const batchUpdateCategory = async (
-  transactionIds: string[],
-  categoryId: string | null
-): Promise<void> => {
-  return batchUpdateTransactions(transactionIds, { category_id: categoryId });
-};
-
 export const flagTransaction = async (transactionId: string, isFlagged: boolean): Promise<Transaction> => {
   const { data, error } = await supabase
     .from('transactions')
@@ -216,101 +200,157 @@ export const flagTransaction = async (transactionId: string, isFlagged: boolean)
   return data;
 };
 
-// Adding the missing getTransactionStats function
-export const getTransactionStats = async (
-  startDate: Date,
-  endDate: Date
-): Promise<{ income: number; expenses: number; }> => {
-  // Get the current user's ID from the session
-  const { data: sessionData } = await supabase.auth.getSession();
-  const userId = sessionData.session?.user.id;
-  
-  if (!userId) {
-    throw new Error('User must be logged in to get transaction stats');
-  }
-  
-  // Format dates for database query
-  const formattedStartDate = startDate.toISOString().split('T')[0];
-  const formattedEndDate = endDate.toISOString().split('T')[0];
-  
-  // Query for transactions within the date range
-  const { data, error } = await supabase
+export const batchDeleteTransactions = async (transactionIds: string[]): Promise<void> => {
+  const { error } = await supabase
     .from('transactions')
-    .select('*, categories:category_id(is_income)')
-    .eq('user_id', userId)
-    .gte('transaction_date', formattedStartDate)
-    .lte('transaction_date', formattedEndDate);
+    .delete()
+    .in('transaction_id', transactionIds);
   
   if (error) throw error;
-  
-  // Process the transactions to calculate income and expenses
-  let income = 0;
-  let expenses = 0;
-  
-  data.forEach((transaction: any) => {
-    const amount = transaction.amount;
-    const isIncome = transaction.categories?.is_income || false;
-    
-    if (isIncome) {
-      income += amount;
-    } else {
-      expenses += Math.abs(amount);
-    }
-  });
-  
-  return {
-    income,
-    expenses,
-  };
 };
 
-export const getFinancialSummary = async (
-  startDate?: string,
-  endDate?: string
-): Promise<FinancialSummary> => {
-  // Get the current user's ID from the session
+export const batchUpdateCategory = async (transactionIds: string[], categoryId: string | null): Promise<void> => {
+  const { error } = await supabase
+    .from('transactions')
+    .update({ category_id: categoryId })
+    .in('transaction_id', transactionIds);
+  
+  if (error) throw error;
+};
+
+export const exportTransactions = async (format: 'csv' | 'json', filters: TransactionFilter = {}): Promise<string> => {
+  // Get all transactions (no pagination)
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user.id;
   
   if (!userId) {
-    throw new Error('User must be logged in to get financial summary');
+    throw new Error('User must be logged in to export transactions');
   }
   
-  // Start with base query
+  // Build query with filters but no pagination
   let query = supabase
     .from('transactions')
-    .select('*, categories:category_id(is_income)')
+    .select(`
+      *,
+      categories (name),
+      accounts (account_name)
+    `)
     .eq('user_id', userId);
-  
-  // Apply date filters if provided
-  if (startDate) {
-    query = query.gte('transaction_date', startDate);
+
+  // Apply filters
+  if (filters.startDate) {
+    query = query.gte('transaction_date', filters.startDate);
+  }
+  if (filters.endDate) {
+    query = query.lte('transaction_date', filters.endDate);
+  }
+  if (filters.categoryId) {
+    query = query.eq('category_id', filters.categoryId);
+  }
+  if (filters.accountId) {
+    query = query.eq('account_id', filters.accountId);
+  }
+  if (filters.minAmount !== undefined) {
+    query = query.gte('amount', filters.minAmount);
+  }
+  if (filters.maxAmount !== undefined) {
+    query = query.lte('amount', filters.maxAmount);
+  }
+  if (filters.searchTerm) {
+    query = query.or(`description.ilike.%${filters.searchTerm}%,merchant.ilike.%${filters.searchTerm}%`);
+  }
+  if (filters.status) {
+    query = query.eq('status', filters.status);
+  }
+  if (filters.isFlagged !== undefined) {
+    query = query.eq('is_flagged', filters.isFlagged);
   }
   
-  if (endDate) {
-    query = query.lte('transaction_date', endDate);
-  }
-  
+  // Execute query
   const { data, error } = await query;
   
   if (error) throw error;
   
-  // Process the transactions to calculate summary
+  // Format data
+  const transactions = (data || []).map(item => {
+    const transaction: any = {
+      id: item.transaction_id,
+      date: item.transaction_date,
+      description: item.description,
+      merchant: item.merchant,
+      amount: item.amount,
+      currency: item.currency,
+      category: item.categories?.name || 'Uncategorized',
+      account: item.accounts?.account_name || 'Unknown',
+      status: item.status,
+      is_flagged: item.is_flagged || false
+    };
+    
+    return transaction;
+  });
+  
+  // Format based on export type
+  if (format === 'json') {
+    return JSON.stringify(transactions, null, 2);
+  } else {
+    // CSV format
+    if (transactions.length === 0) {
+      return 'id,date,description,merchant,amount,currency,category,account,status,is_flagged';
+    }
+    
+    const headers = Object.keys(transactions[0]).join(',');
+    const rows = transactions.map(t => 
+      Object.values(t)
+        .map(v => typeof v === 'string' ? `"${v.replace(/"/g, '""')}"` : v)
+        .join(',')
+    );
+    
+    return [headers, ...rows].join('\n');
+  }
+};
+
+export const getTransactionStats = async (startDate?: string, endDate?: string): Promise<FinancialSummary> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to fetch transaction statistics');
+  }
+  
+  // Set default date range to current month if not provided
+  const currentDate = new Date();
+  const defaultStartDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString();
+  const defaultEndDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString();
+  
+  const start = startDate || defaultStartDate;
+  const end = endDate || defaultEndDate;
+  
+  // Fetch transactions for the period
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('amount')
+    .eq('user_id', userId)
+    .gte('transaction_date', start)
+    .lte('transaction_date', end);
+  
+  if (error) throw error;
+  
+  // Calculate stats
+  const transactions = data || [];
+  const totalTransactions = transactions.length;
+  
   let totalIncome = 0;
   let totalExpenses = 0;
   
-  data.forEach((transaction: any) => {
-    const amount = transaction.amount;
-    const isIncome = transaction.categories?.is_income || false;
-    
-    if (isIncome) {
-      totalIncome += amount;
+  transactions.forEach(t => {
+    if (t.amount > 0) {
+      totalIncome += t.amount;
     } else {
-      totalExpenses += Math.abs(amount);
+      totalExpenses += Math.abs(t.amount);
     }
   });
   
-  const totalTransactions = data.length;
   const averageTransaction = totalTransactions > 0 
     ? (totalIncome + totalExpenses) / totalTransactions 
     : 0;
@@ -321,64 +361,4 @@ export const getFinancialSummary = async (
     totalExpenses,
     averageTransaction
   };
-};
-
-export const exportTransactions = async (format: 'csv' | 'json' = 'csv', filter: TransactionFilter = {}): Promise<string> => {
-  // Get the current user's ID from the session
-  const { data: sessionData } = await supabase.auth.getSession();
-  const userId = sessionData.session?.user.id;
-  
-  if (!userId) {
-    throw new Error('User must be logged in to export transactions');
-  }
-  
-  // Build the query with filters
-  let query = supabase
-    .from('transactions')
-    .select('*, categories:category_id(name), accounts:account_id(account_name)')
-    .eq('user_id', userId)
-    .order('transaction_date', { ascending: false });
-  
-  // Apply filters
-  query = buildFilterQuery(query, filter);
-  
-  const { data, error } = await query;
-  
-  if (error) throw error;
-  
-  // Transform the data to match the Transaction type
-  const transactions = data.map((item: any) => ({
-    ...item,
-    category_name: item.categories?.name,
-    account_name: item.accounts?.account_name,
-  }));
-  
-  if (format === 'json') {
-    return JSON.stringify(transactions, null, 2);
-  } else {
-    // CSV format
-    const headers = [
-      'Transaction Date',
-      'Description',
-      'Merchant',
-      'Category',
-      'Account',
-      'Amount',
-      'Currency',
-      'Status'
-    ].join(',');
-    
-    const rows = transactions.map((t: Transaction) => [
-      t.transaction_date,
-      `"${t.description.replace(/"/g, '""')}"`,
-      `"${t.merchant.replace(/"/g, '""')}"`,
-      `"${t.category_name || 'Uncategorized'}"`,
-      `"${t.account_name || ''}"`,
-      t.amount,
-      t.currency,
-      t.status
-    ].join(','));
-    
-    return [headers, ...rows].join('\n');
-  }
 };
