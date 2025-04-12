@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import PageTemplate from "./PageTemplate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +15,6 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, subMonths } from "date-fns";
 
-// Define SavingsAccount interface properly with required fields
 interface SavingsAccount {
   id: string;
   name: string;
@@ -26,7 +24,6 @@ interface SavingsAccount {
   institution: string;
 }
 
-// Mock data for savings accounts
 const mockAccounts: SavingsAccount[] = [
   {
     id: "sav1",
@@ -54,7 +51,6 @@ const mockAccounts: SavingsAccount[] = [
   },
 ];
 
-// Mock data for historical savings
 const generateHistoricalData = () => {
   const data = [];
   const now = new Date();
@@ -74,7 +70,6 @@ const generateHistoricalData = () => {
 
 const mockHistoricalData = generateHistoricalData();
 
-// Form schema for account creation/editing
 const accountSchema = z.object({
   name: z.string().min(1, "Account name is required"),
   balance: z.coerce.number().nonnegative("Balance cannot be negative"),
@@ -91,7 +86,6 @@ export default function Savings() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [historicalData] = useState(mockHistoricalData);
 
-  // Setup form
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
@@ -103,12 +97,10 @@ export default function Savings() {
     },
   });
 
-  // Handle form submission
   const onSubmit = (values: AccountFormValues) => {
     if (editingAccount) {
-      // Update existing account - ensure all required fields are included
       const updatedAccounts = accounts.map(account => 
-        account.id === editingAccount.id ? { ...values, id: account.id } : account
+        account.id === editingAccount.id ? { ...account, ...values } : account
       );
       setAccounts(updatedAccounts);
       toast({
@@ -116,7 +108,6 @@ export default function Savings() {
         description: `${values.name} has been updated successfully`,
       });
     } else {
-      // Add new account - ensure all required fields are included
       const newAccount: SavingsAccount = {
         id: `sav${accounts.length + 1}`,
         name: values.name,
@@ -137,7 +128,6 @@ export default function Savings() {
     form.reset();
   };
 
-  // Handle edit account
   const handleEditAccount = (account: SavingsAccount) => {
     setEditingAccount(account);
     form.reset({
@@ -150,7 +140,6 @@ export default function Savings() {
     setIsAddOpen(true);
   };
 
-  // Handle delete account
   const handleDeleteAccount = (id: string) => {
     const updatedAccounts = accounts.filter(account => account.id !== id);
     setAccounts(updatedAccounts);
@@ -160,12 +149,10 @@ export default function Savings() {
     });
   };
 
-  // Calculate total balance
   const calculateTotalBalance = () => {
     return accounts.reduce((total, account) => total + account.balance, 0);
   };
 
-  // Project balance in 1 year
   const projectBalance = (months: number) => {
     return accounts.reduce((total, account) => {
       const monthlyInterestRate = account.interestRate / 100 / 12;
@@ -174,9 +161,8 @@ export default function Savings() {
     }, 0);
   };
 
-  // Monthly savings rate calculation
-  const monthlySavingsRate = 2500; // Mock monthly contribution
-  const monthlyIncome = 8000; // Mock monthly income
+  const monthlySavingsRate = 2500;
+  const monthlyIncome = 8000;
   const savingsPercentage = (monthlySavingsRate / monthlyIncome) * 100;
 
   return (
@@ -185,7 +171,6 @@ export default function Savings() {
       subtitle="Manage and track your savings and investments"
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Summary cards */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Total Balance</CardTitle>
@@ -229,7 +214,6 @@ export default function Savings() {
         </Card>
       </div>
       
-      {/* Savings trend chart */}
       <Card className="mt-6">
         <CardHeader>
           <CardTitle>Savings Growth</CardTitle>
@@ -277,7 +261,6 @@ export default function Savings() {
         </CardContent>
       </Card>
       
-      {/* Accounts list */}
       <Card className="mt-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Your Accounts</CardTitle>
@@ -411,7 +394,6 @@ export default function Savings() {
           ) : (
             <div className="space-y-4">
               {accounts.map((account) => {
-                // Calculate monthly interest
                 const monthlyInterest = account.balance * (account.interestRate / 100 / 12);
                 
                 return (
@@ -472,7 +454,6 @@ export default function Savings() {
         </CardContent>
       </Card>
       
-      {/* Savings calculator */}
       <Card className="mt-6">
         <CardHeader>
           <CardTitle>Compound Interest Calculator</CardTitle>

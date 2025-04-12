@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import PageTemplate from "./PageTemplate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -448,7 +447,6 @@ export default function Calendar() {
         onAddTransaction={handleAddTransaction}
         accounts={mockAccounts}
         categories={mockCategories}
-        initialDate={selectedDate}
       />
     </PageTemplate>
   );

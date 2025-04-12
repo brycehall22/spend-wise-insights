@@ -99,7 +99,7 @@ export default function Goals() {
   const onSubmit = (values: GoalFormValues) => {
     if (editingGoal) {
       const updatedGoals = goals.map(goal => 
-        goal.id === editingGoal.id ? { ...values, id: goal.id } : goal
+        goal.id === editingGoal.id ? { ...goal, ...values } : goal
       );
       setGoals(updatedGoals);
       toast({
