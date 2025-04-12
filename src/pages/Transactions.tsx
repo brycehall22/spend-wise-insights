@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import PageTemplate from './PageTemplate';
 import { useToast } from "@/hooks/use-toast";
@@ -299,7 +298,7 @@ export default function Transactions() {
           <TransactionFilters 
             onApplyFilters={handleFilterChange}
             initialFilters={filters}
-            categories={(categories || []) as Category[]}
+            categories={categories || []}
             accounts={accounts || []}
           />
         </Card>

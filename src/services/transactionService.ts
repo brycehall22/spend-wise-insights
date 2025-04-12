@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { DbTransaction, Transaction, TransactionFilter, FinancialSummary } from "@/types/database.types";
 
@@ -9,6 +10,12 @@ interface PaginationResult {
 interface TransactionsResponse {
   transactions: Transaction[];
   pagination: PaginationResult;
+}
+
+// Type for database transaction records including the join tables
+interface DbTransactionWithRelations extends DbTransaction {
+  categories?: { name: string };
+  accounts?: { account_name: string; currency: string };
 }
 
 export const getTransactions = async (
@@ -81,17 +88,25 @@ export const getTransactions = async (
   if (error) throw error;
   
   // Format the results
-  const transactions: Transaction[] = (data || []).map(item => {
+  const transactions: Transaction[] = (data || []).map((item: DbTransactionWithRelations) => {
+    // Create a transaction object with properly defined types
     const transaction: Transaction = {
-      ...item,
+      transaction_id: item.transaction_id,
+      user_id: item.user_id,
+      account_id: item.account_id,
+      category_id: item.category_id,
+      amount: item.amount,
+      currency: item.currency,
+      description: item.description,
+      merchant: item.merchant,
+      transaction_date: item.transaction_date,
+      status: item.status,
+      is_flagged: item.is_flagged || false,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
       category_name: item.categories?.name,
-      account_name: item.accounts?.account_name,
-      is_flagged: item.is_flagged || false
-    } as Transaction;
-    
-    // Remove nested objects
-    delete transaction.categories;
-    delete transaction.accounts;
+      account_name: item.accounts?.account_name
+    };
     
     return transaction;
   });
@@ -126,15 +141,24 @@ export const getTransactionById = async (transactionId: string): Promise<Transac
   
   if (!data) return null;
   
-  const transaction: any = {
-    ...data,
+  // Create transaction with correct typing
+  const transaction: Transaction = {
+    transaction_id: data.transaction_id,
+    user_id: data.user_id,
+    account_id: data.account_id,
+    category_id: data.category_id,
+    amount: data.amount,
+    currency: data.currency,
+    description: data.description,
+    merchant: data.merchant,
+    transaction_date: data.transaction_date,
+    status: data.status,
+    is_flagged: data.is_flagged || false,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
     category_name: data.categories?.name,
-    account_name: data.accounts?.account_name,
+    account_name: data.accounts?.account_name
   };
-  
-  // Remove nested objects
-  delete transaction.categories;
-  delete transaction.accounts;
   
   return transaction;
 };

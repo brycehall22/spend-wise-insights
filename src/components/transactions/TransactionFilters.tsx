@@ -24,24 +24,13 @@ import {
 import { cn } from "@/lib/utils";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { TransactionFilter } from "@/types/database.types";
-
-interface Category {
-  category_id: string;
-  name: string;
-  parent_category_id: string | null;
-}
-
-interface Account {
-  account_id: string;
-  account_name: string;
-}
+import { TransactionFilter, Category, DbAccount } from "@/types/database.types";
 
 interface TransactionFiltersProps {
-  onApplyFilters: (filters: FilterState) => void;
+  onApplyFilters: (filters: TransactionFilter) => void;
   initialFilters: TransactionFilter;
   categories: Category[];
-  accounts: Account[];
+  accounts: DbAccount[];
   activeFilters?: number;
 }
 
