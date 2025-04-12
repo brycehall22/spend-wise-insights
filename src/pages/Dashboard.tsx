@@ -41,7 +41,7 @@ export default function Dashboard() {
   // Get categories for charts
   const { data: categories, isLoading: loadingCategories } = useQuery({
     queryKey: ['categories'],
-    queryFn: getCategories,
+    queryFn: () => getCategories(),
   });
 
   const isLoading = loadingStats || loadingAccounts || loadingBudget || loadingCategories;

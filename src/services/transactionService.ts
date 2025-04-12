@@ -216,6 +216,54 @@ export const flagTransaction = async (transactionId: string, isFlagged: boolean)
   return data;
 };
 
+// Adding the missing getTransactionStats function
+export const getTransactionStats = async (
+  startDate: Date,
+  endDate: Date
+): Promise<{ income: number; expenses: number; }> => {
+  // Get the current user's ID from the session
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  
+  if (!userId) {
+    throw new Error('User must be logged in to get transaction stats');
+  }
+  
+  // Format dates for database query
+  const formattedStartDate = startDate.toISOString().split('T')[0];
+  const formattedEndDate = endDate.toISOString().split('T')[0];
+  
+  // Query for transactions within the date range
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*, categories:category_id(is_income)')
+    .eq('user_id', userId)
+    .gte('transaction_date', formattedStartDate)
+    .lte('transaction_date', formattedEndDate);
+  
+  if (error) throw error;
+  
+  // Process the transactions to calculate income and expenses
+  let income = 0;
+  let expenses = 0;
+  
+  data.forEach((transaction: any) => {
+    const amount = transaction.amount;
+    const isIncome = transaction.categories?.is_income || false;
+    
+    if (isIncome) {
+      income += amount;
+    } else {
+      expenses += Math.abs(amount);
+    }
+  });
+  
+  return {
+    income,
+    expenses,
+  };
+};
+
 export const getFinancialSummary = async (
   startDate?: string,
   endDate?: string

@@ -1,9 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { Category, DbCategory } from "@/types/database.types";
-import { transformResponse, transformSingleCategoryResponse } from "@/types/supabase";
+import { DbCategory, Category } from "@/types/database.types";
 
-export const getCategories = async (includeIncome: boolean = true): Promise<DbCategory[]> => {
+export const getCategories = async (includeIncome?: boolean): Promise<DbCategory[]> => {
   // Get the current user's ID from the session
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user.id;
@@ -12,16 +10,19 @@ export const getCategories = async (includeIncome: boolean = true): Promise<DbCa
     throw new Error('User must be logged in to fetch categories');
   }
   
+  // Build query
   let query = supabase
     .from('categories')
     .select('*')
     .eq('user_id', userId);
   
-  if (!includeIncome) {
-    query = query.eq('is_income', false);
+  // Apply income filter if provided
+  if (includeIncome !== undefined) {
+    query = query.eq('is_income', includeIncome);
   }
-    
-  const { data, error } = await query.order('name', { ascending: true });
+  
+  // Execute query
+  const { data, error } = await query;
   
   if (error) throw error;
   
