@@ -1,10 +1,10 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   DbTransaction, 
   Transaction, 
   TransactionFilter, 
-  FinancialSummary,
-  DbTransactionWithRelations 
+  FinancialSummary
 } from "@/types/database.types";
 
 interface PaginationResult {
@@ -15,6 +15,13 @@ interface PaginationResult {
 interface TransactionsResponse {
   transactions: Transaction[];
   pagination: PaginationResult;
+}
+
+// Define the type for database transaction records including join tables
+interface DbTransactionWithRelations extends DbTransaction {
+  categories?: { name: string };
+  accounts?: { account_name: string; currency: string };
+  is_flagged?: boolean;
 }
 
 export const getTransactions = async (
@@ -86,7 +93,7 @@ export const getTransactions = async (
   
   if (error) throw error;
   
-  // Format the results
+  // Format the results - use type assertion to avoid deep type instantiation
   const transactions: Transaction[] = (data || []).map((item: any) => {
     // Create a transaction object with properly defined types
     const transaction: Transaction = {
@@ -303,7 +310,7 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   
   if (error) throw error;
   
-  // Format data
+  // Format data - use type assertion to avoid deep type instantiation
   const transactions = (data || []).map((item: any) => {
     const transaction: any = {
       id: item.transaction_id,
