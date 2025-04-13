@@ -55,24 +55,26 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   
   if (error) throw error;
   
-  // Transform data to a simpler format to avoid deep recursion
+  // Transform data to a simpler format to avoid deep recursion issues
   const transactions: Array<Record<string, any>> = [];
   
   if (data) {
     for (const item of data) {
-      // Use a simple spread with explicit typing to avoid deep recursion
-      const transaction = {
+      // Use explicit property assignment without spreads to avoid type recursion
+      const transaction: Record<string, any> = {
         id: item.transaction_id,
         date: item.transaction_date,
         description: item.description,
         merchant: item.merchant,
         amount: item.amount,
         currency: item.currency,
-        category: item.categories?.name || 'Uncategorized',
-        account: item.accounts?.account_name || 'Unknown',
-        status: item.status,
-        is_flagged: item.is_flagged ?? false
+        category: item.categories ? item.categories.name : 'Uncategorized',
+        account: item.accounts ? item.accounts.account_name : 'Unknown',
+        status: item.status
       };
+      
+      // Safely handle is_flagged property whether it exists or not
+      transaction.is_flagged = 'is_flagged' in item ? item.is_flagged : false;
       
       transactions.push(transaction);
     }
