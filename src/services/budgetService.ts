@@ -123,11 +123,18 @@ export const createBudget = async (budgetData: Partial<Budget>): Promise<Budget>
     throw new Error('User must be logged in to create a budget');
   }
   
+  // FIX: Ensure all required fields are present
+  if (!budgetData.amount || !budgetData.month) {
+    throw new Error('Budget amount and month are required');
+  }
+  
   const { data, error } = await supabase
     .from('budgets')
     .insert({
-      ...budgetData,
-      user_id: userId
+      user_id: userId,
+      amount: budgetData.amount,
+      month: budgetData.month,
+      category_id: budgetData.category_id || null,
     })
     .select()
     .single();
@@ -148,9 +155,16 @@ export const updateBudget = async (budgetId: string, budgetData: Partial<Budget>
     throw new Error('User must be logged in to update a budget');
   }
   
+  // FIX: Create an update object with only valid fields
+  const updateData: Record<string, any> = {};
+  
+  if (budgetData.amount !== undefined) updateData.amount = budgetData.amount;
+  if (budgetData.category_id !== undefined) updateData.category_id = budgetData.category_id;
+  if (budgetData.month !== undefined) updateData.month = budgetData.month;
+  
   const { data, error } = await supabase
     .from('budgets')
-    .update(budgetData)
+    .update(updateData)
     .eq('user_id', userId)
     .eq('budget_id', budgetId)
     .select()

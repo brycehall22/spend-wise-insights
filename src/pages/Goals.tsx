@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import PageTemplate from "./PageTemplate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -46,7 +45,7 @@ export default function Goals() {
   // Fetch categories for the form
   const { data: categories, isLoading: loadingCategories } = useQuery({
     queryKey: ['categories'],
-    queryFn: getCategories
+    queryFn: () => getCategories()
   });
   
   // Create goal mutation
