@@ -55,21 +55,25 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   
   if (error) throw error;
   
-  // Transform data with explicit typing to avoid deep recursion
-  const transactions = (data || []).map((item: any) => {
-    return {
-      id: item.transaction_id,
-      date: item.transaction_date,
-      description: item.description,
-      merchant: item.merchant,
-      amount: item.amount,
-      currency: item.currency,
-      category: item.categories?.name || 'Uncategorized',
-      account: item.accounts?.account_name || 'Unknown',
-      status: item.status,
-      is_flagged: item.is_flagged ?? false
-    };
-  });
+  // Use a simpler approach to transform data to avoid deep recursion
+  const transactions = [];
+  if (data) {
+    for (const item of data) {
+      const transaction = {
+        id: item.transaction_id,
+        date: item.transaction_date,
+        description: item.description,
+        merchant: item.merchant,
+        amount: item.amount,
+        currency: item.currency,
+        category: item.categories?.name || 'Uncategorized',
+        account: item.accounts?.account_name || 'Unknown',
+        status: item.status,
+        is_flagged: item.is_flagged ?? false
+      };
+      transactions.push(transaction);
+    }
+  }
   
   // Format based on export type
   if (format === 'json') {

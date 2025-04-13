@@ -21,8 +21,8 @@ export const batchUpdateCategory = async (transactionIds: string[], categoryId: 
 };
 
 export const flagTransaction = async (transactionId: string, isFlagged: boolean): Promise<Transaction> => {
-  // Create a properly typed update object
-  const updateData = { is_flagged: isFlagged };
+  // Create a properly typed update object that matches the expected types
+  const updateData: { is_flagged?: boolean } = { is_flagged: isFlagged };
   
   const { data, error } = await supabase
     .from('transactions')
