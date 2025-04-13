@@ -26,6 +26,7 @@ export default function AppSidebar() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   
+  // Get user initials for avatar
   const initials = user?.email 
     ? user.email.substring(0, 2).toUpperCase() 
     : "SP";
@@ -86,13 +87,13 @@ export default function AppSidebar() {
           </div>
           
           <div className="px-3 py-4">
-            <div className="mb-4 flex items-center gap-3 rounded-lg px-3 py-2">
+            <div className="mb-4 flex items-center gap-3 rounded-lg px-3 py-2 bg-gray-50">
               <Avatar>
                 <AvatarImage src={user?.user_metadata?.avatar_url} />
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
-              <div>
-                <p className="font-medium">{user?.email}</p>
+              <div className="overflow-hidden">
+                <p className="font-medium text-sm truncate">{user?.email}</p>
               </div>
             </div>
             
@@ -163,12 +164,12 @@ export default function AppSidebar() {
           </div>
           
           <div className="px-3 py-4">
-            <div className="mb-4 flex items-center gap-3 rounded-lg px-3 py-2">
+            <div className="mb-4 flex items-center gap-3 rounded-lg px-3 py-2 bg-gray-50">
               <Avatar>
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
-              <div>
-                <p className="font-medium">{user?.email}</p>
+              <div className="overflow-hidden">
+                <p className="font-medium text-sm truncate">{user?.email}</p>
               </div>
             </div>
             

@@ -14,21 +14,46 @@ import { Button } from "@/components/ui/button";
 import { format, subMonths, subYears } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { mockIncomeVsExpenses, mockCategoryTrends } from "@/lib/mockData";
+import { useQuery } from "@tanstack/react-query";
+import { 
+  getIncomeExpensesData, 
+  getCategorySpendingByPeriod,
+  getTopMerchants,
+  getMonthlySavingRates,
+  getMonthlySnapshot
+} from "@/services/analyticsService";
+import { exportTransactions } from "@/services/transaction/transactionExport";
+import { toast } from "@/components/ui/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import SpendingByCategoryChart from "@/components/dashboard/SpendingByCategoryChart";
 import IncomeVsExpensesChart from "@/components/dashboard/IncomeVsExpensesChart";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Bar, BarChart as RechartsBarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { 
+  Bar, 
+  BarChart as RechartsBarChart, 
+  CartesianGrid, 
+  Legend, 
+  ResponsiveContainer, 
+  Tooltip, 
+  XAxis, 
+  YAxis, 
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell
+} from "recharts";
+
+// Default colors for pie chart
+const COLORS = ['#FF5722', '#2196F3', '#4CAF50', '#9C27B0', '#FFC107', '#607D8B', '#795548', '#3F51B5', '#E91E63', '#00BCD4'];
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState("6m");
   const [comparisonType, setComparisonType] = useState("month");
-  const [exportFormat, setExportFormat] = useState("pdf");
+  const [exportFormat, setExportFormat] = useState("csv");
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Calculate date range for display
-  const getDateRangeDisplay = () => {
+  // Calculate date range based on selection
+  const getDateRange = () => {
     const endDate = new Date();
     let startDate;
     
@@ -49,33 +74,80 @@ export default function Analytics() {
         startDate = subMonths(endDate, 6);
     }
     
+    return { startDate, endDate };
+  };
+
+  // Get date range for display
+  const getDateRangeDisplay = () => {
+    const { startDate, endDate } = getDateRange();
     return `${format(startDate, "MMM d, yyyy")} - ${format(endDate, "MMM d, yyyy")}`;
   };
 
-  // Mock merchant spending data
-  const merchantSpendingData = [
-    { merchant: "Amazon", amount: 453.27 },
-    { merchant: "Grocery Store", amount: 329.84 },
-    { merchant: "Gas Station", amount: 187.62 },
-    { merchant: "Netflix", amount: 15.99 },
-    { merchant: "Coffee Shop", amount: 78.35 },
-  ];
+  // Fetch category spending data
+  const { startDate, endDate } = getDateRange();
+  const { data: categorySpending, isLoading: loadingCategoryData } = useQuery({
+    queryKey: ['categorySpending', dateRange],
+    queryFn: () => getCategorySpendingByPeriod(startDate, endDate)
+  });
+
+  // Fetch merchant spending data
+  const { data: merchantSpendingData, isLoading: loadingMerchants } = useQuery({
+    queryKey: ['merchantSpending', dateRange],
+    queryFn: () => getTopMerchants(startDate, endDate)
+  });
+
+  // Fetch saving rate data
+  const { data: savingRateData, isLoading: loadingSavingRate } = useQuery({
+    queryKey: ['savingRate', dateRange],
+    queryFn: () => getMonthlySavingRates(dateRange === '3m' ? 3 : dateRange === '1y' ? 12 : 6)
+  });
+
+  // Fetch monthly snapshot
+  const { data: monthlySnapshot, isLoading: loadingSnapshot } = useQuery({
+    queryKey: ['monthlySnapshot'],
+    queryFn: getMonthlySnapshot
+  });
 
   // Function to handle export
-  const handleExport = () => {
-    // This would be implemented to generate and download reports
-    alert(`Exporting data as ${exportFormat.toUpperCase()}...`);
+  const handleExport = async () => {
+    try {
+      const { startDate, endDate } = getDateRange();
+      const filters = {
+        startDate: format(startDate, 'yyyy-MM-dd'),
+        endDate: format(endDate, 'yyyy-MM-dd')
+      };
+
+      // Export transactions
+      const data = await exportTransactions(exportFormat as 'csv' | 'json', filters);
+      
+      // Create download link
+      const blob = new Blob([data], { 
+        type: exportFormat === 'csv' ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8' 
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `transactions-export.${exportFormat}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Export successful",
+        description: `Your transactions have been exported as ${exportFormat.toUpperCase()}`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export failed",
+        description: "There was a problem exporting your transactions",
+        variant: "destructive",
+      });
+    }
   };
 
-  // Mock monthly saving rate data
-  const savingRateData = [
-    { month: 'Jan', savingRate: 15 },
-    { month: 'Feb', savingRate: 12 },
-    { month: 'Mar', savingRate: 18 },
-    { month: 'Apr', savingRate: 22 },
-    { month: 'May', savingRate: 20 },
-    { month: 'Jun', savingRate: 25 },
-  ];
+  // Aggregate loading state
+  const isLoading = loadingCategoryData || loadingMerchants || loadingSavingRate || loadingSnapshot;
 
   return (
     <PageTemplate 
@@ -121,9 +193,8 @@ export default function Analytics() {
               <SelectValue placeholder="Export" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="pdf">PDF</SelectItem>
               <SelectItem value="csv">CSV</SelectItem>
-              <SelectItem value="xlsx">Excel</SelectItem>
+              <SelectItem value="json">JSON</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="outline" size="sm" onClick={handleExport}>
@@ -185,36 +256,48 @@ export default function Analytics() {
               </CardHeader>
               <CardContent>
                 <div className="h-72">
-                  <ChartContainer 
-                    config={{
-                      savingRate: {
-                        label: "Saving Rate",
-                        color: "#4CAF50"
-                      }
-                    }}
-                  >
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsBarChart data={savingRateData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                        <XAxis dataKey="month" />
-                        <YAxis 
-                          tickFormatter={(value) => `${value}%`}
-                        />
-                        <ChartTooltip 
-                          content={
-                            <ChartTooltipContent 
-                              formatter={(value) => [`${value}%`, "Saving Rate"]}
-                            />
-                          }
-                        />
-                        <Bar 
-                          dataKey="savingRate" 
-                          name="savingRate" 
-                          fill="var(--color-savingRate, #4CAF50)" 
-                        />
-                      </RechartsBarChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
+                  {isLoading || !savingRateData ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Skeleton className="h-full w-full" />
+                    </div>
+                  ) : (
+                    <ChartContainer 
+                      config={{
+                        savingRate: {
+                          label: "Saving Rate",
+                          color: "#4CAF50"
+                        }
+                      }}
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsBarChart data={savingRateData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+                          <XAxis dataKey="month" />
+                          <YAxis 
+                            tickFormatter={(value) => `${value}%`}
+                          />
+                          <ChartTooltip 
+                            content={
+                              <ChartTooltipContent 
+                                formatter={(value, name, props) => {
+                                  const item = props.payload;
+                                  return [
+                                    `${value}%`, 
+                                    `Saving Rate (${item.fullMonth})`
+                                  ];
+                                }}
+                              />
+                            }
+                          />
+                          <Bar 
+                            dataKey="savingRate" 
+                            name="savingRate" 
+                            fill="var(--color-savingRate, #4CAF50)" 
+                          />
+                        </RechartsBarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -230,14 +313,29 @@ export default function Analytics() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {merchantSpendingData.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="font-medium">{item.merchant}</span>
-                      <span className="text-muted-foreground">${item.amount.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
+                {isLoading || !merchantSpendingData ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4, 5].map(index => (
+                      <div key={index} className="flex items-center justify-between">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                ) : merchantSpendingData.length > 0 ? (
+                  <div className="space-y-4">
+                    {merchantSpendingData.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <span className="font-medium">{item.merchant}</span>
+                        <span className="text-muted-foreground">${item.amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-muted-foreground">
+                    <p>No merchant data available</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
             
@@ -250,50 +348,104 @@ export default function Analytics() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <dl className="space-y-4">
-                  <div className="flex justify-between">
-                    <dt className="font-medium">Total Income</dt>
-                    <dd className="text-green-600">$4,582.30</dd>
+                {isLoading || !monthlySnapshot ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4, 5].map(index => (
+                      <div key={index} className="flex justify-between">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex justify-between">
-                    <dt className="font-medium">Total Expenses</dt>
-                    <dd className="text-red-600">$3,428.12</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="font-medium">Net Savings</dt>
-                    <dd className="text-blue-600">$1,154.18</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="font-medium">Saving Rate</dt>
-                    <dd className="text-blue-600">25.2%</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="font-medium">Avg. Daily Spending</dt>
-                    <dd className="text-muted-foreground">$114.27</dd>
-                  </div>
-                </dl>
+                ) : (
+                  <dl className="space-y-4">
+                    <div className="flex justify-between">
+                      <dt className="font-medium">Total Income</dt>
+                      <dd className="text-green-600">
+                        ${monthlySnapshot.totalIncome.toFixed(2)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="font-medium">Total Expenses</dt>
+                      <dd className="text-red-600">
+                        ${monthlySnapshot.totalExpenses.toFixed(2)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="font-medium">Net Savings</dt>
+                      <dd className="text-blue-600">
+                        ${monthlySnapshot.netSavings.toFixed(2)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="font-medium">Saving Rate</dt>
+                      <dd className="text-blue-600">
+                        {monthlySnapshot.savingRate.toFixed(1)}%
+                      </dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="font-medium">Avg. Daily Spending</dt>
+                      <dd className="text-muted-foreground">
+                        ${monthlySnapshot.avgDailySpending.toFixed(2)}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
         
         <TabsContent value="spending" className="space-y-6">
+          {/* Category breakdown pie chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Detailed Spending Analysis</CardTitle>
+              <CardTitle>Category Breakdown</CardTitle>
               <CardDescription>
-                Coming soon: Deep dive into your spending patterns
+                Detailed view of your spending by category
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <BarChart size={48} className="text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Detailed Spending Analysis</h3>
-                <p className="text-muted-foreground max-w-md">
-                  This section will provide in-depth analysis of your spending 
-                  patterns with advanced filtering options.
-                </p>
-              </div>
+            <CardContent className="h-96">
+              {isLoading || !categorySpending ? (
+                <div className="flex items-center justify-center h-full">
+                  <Skeleton className="h-60 w-60 rounded-full" />
+                </div>
+              ) : categorySpending.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={categorySpending}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                      outerRadius={150}
+                      fill="#8884d8"
+                      dataKey="amount"
+                      nameKey="name"
+                    >
+                      {categorySpending.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.color || COLORS[index % COLORS.length]} 
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: number) => `$${value.toFixed(2)}`}
+                    />
+                    <Legend />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <PieChart size={48} className="text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Spending Data</h3>
+                  <p className="text-muted-foreground max-w-md text-center">
+                    Add transactions to see a breakdown of your spending by category.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -303,7 +455,7 @@ export default function Analytics() {
             <CardHeader>
               <CardTitle>Income Analysis</CardTitle>
               <CardDescription>
-                Coming soon: Track and analyze your income sources
+                Track and analyze your income sources
               </CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-center py-12">
@@ -324,12 +476,12 @@ export default function Analytics() {
             <CardHeader>
               <CardTitle>Financial Trends</CardTitle>
               <CardDescription>
-                Coming soon: Long-term financial pattern analysis
+                Long-term financial pattern analysis
               </CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-center py-12">
               <div className="text-center">
-                <PieChart size={48} className="text-muted-foreground mx-auto mb-4" />
+                <LineChart size={48} className="text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">Trend Analysis</h3>
                 <p className="text-muted-foreground max-w-md">
                   This section will provide long-term trend analysis to help 

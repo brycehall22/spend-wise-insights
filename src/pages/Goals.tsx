@@ -1,438 +1,512 @@
+
 import { useState } from "react";
 import PageTemplate from "./PageTemplate";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getSavingsGoals, createSavingsGoal, updateSavingsGoal, deleteSavingsGoal } from "@/services/savingsGoalService";
+import { getCategories } from "@/services/categoryService";
 import { Progress } from "@/components/ui/progress";
-import { CalendarIcon, Check, Plus, Target, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format, addMonths } from "date-fns";
+import { toast } from "@/components/ui/use-toast";
+import { CalendarIcon, Check, CheckCircle2, Circle, Edit, Plus, Target, Trash2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toast } from "@/hooks/use-toast";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-
-interface Goal {
-  id: string;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-  deadline: Date;
-  category: string;
-  priority: "low" | "medium" | "high";
-}
-
-const mockGoals: Goal[] = [
-  {
-    id: "g1",
-    name: "Emergency Fund",
-    targetAmount: 10000,
-    currentAmount: 5500,
-    deadline: new Date(2025, 3, 15),
-    category: "savings",
-    priority: "high",
-  },
-  {
-    id: "g2",
-    name: "New Car",
-    targetAmount: 25000,
-    currentAmount: 8000,
-    deadline: new Date(2025, 8, 1),
-    category: "purchase",
-    priority: "medium",
-  },
-  {
-    id: "g3",
-    name: "Vacation",
-    targetAmount: 3000,
-    currentAmount: 2800,
-    deadline: new Date(2024, 11, 10),
-    category: "travel",
-    priority: "low",
-  },
-  {
-    id: "g4", 
-    name: "Down Payment",
-    targetAmount: 50000,
-    currentAmount: 12000,
-    deadline: new Date(2026, 6, 30),
-    category: "housing",
-    priority: "high",
-  }
-];
-
-const goalSchema = z.object({
-  name: z.string().min(1, "Goal name is required"),
-  targetAmount: z.coerce.number().positive("Amount must be positive"),
-  currentAmount: z.coerce.number().nonnegative("Amount cannot be negative"),
-  deadline: z.date().refine(date => date > new Date(), {
-    message: "Deadline must be in the future",
-  }),
-  category: z.string().min(1, "Category is required"),
-  priority: z.enum(["low", "medium", "high"]),
-});
-
-type GoalFormValues = z.infer<typeof goalSchema>;
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function Goals() {
-  const [goals, setGoals] = useState<Goal[]>(mockGoals);
-  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-
-  const form = useForm<GoalFormValues>({
-    resolver: zodResolver(goalSchema),
-    defaultValues: {
-      name: "",
-      targetAmount: 0,
-      currentAmount: 0,
-      deadline: new Date(new Date().setMonth(new Date().getMonth() + 6)),
-      category: "savings",
-      priority: "medium",
-    },
+  const [activeTab, setActiveTab] = useState("all");
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<any>(null);
+  const [deleteGoalId, setDeleteGoalId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    target_amount: "",
+    current_amount: "",
+    start_date: new Date().toISOString().split('T')[0],
+    target_date: addMonths(new Date(), 6).toISOString().split('T')[0],
+    category_id: "",
   });
-
-  const onSubmit = (values: GoalFormValues) => {
-    if (editingGoal) {
-      const updatedGoals = goals.map(goal => 
-        goal.id === editingGoal.id ? { ...goal, ...values } : goal
-      );
-      setGoals(updatedGoals);
-      toast({
-        title: "Goal updated",
-        description: `${values.name} has been updated successfully`,
-      });
-    } else {
-      const newGoal: Goal = {
-        id: `g${goals.length + 1}`,
-        name: values.name, 
-        targetAmount: values.targetAmount,
-        currentAmount: values.currentAmount,
-        deadline: values.deadline,
-        category: values.category,
-        priority: values.priority
-      };
-      setGoals([...goals, newGoal]);
+  
+  const queryClient = useQueryClient();
+  
+  // Fetch all savings goals
+  const { data: goals, isLoading: loadingGoals } = useQuery({
+    queryKey: ['savingsGoals'],
+    queryFn: getSavingsGoals
+  });
+  
+  // Fetch categories for the form
+  const { data: categories, isLoading: loadingCategories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories
+  });
+  
+  // Create goal mutation
+  const createGoalMutation = useMutation({
+    mutationFn: (goalData: any) => createSavingsGoal(goalData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['savingsGoals'] });
+      setGoalModalOpen(false);
+      resetForm();
       toast({
         title: "Goal created",
-        description: `${values.name} has been added to your financial goals`,
+        description: "Your savings goal has been created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error creating goal",
+        description: error.message || "An error occurred while creating the goal",
+        variant: "destructive",
       });
     }
-
-    setIsAddOpen(false);
-    setEditingGoal(null);
-    form.reset();
+  });
+  
+  // Update goal mutation
+  const updateGoalMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => updateSavingsGoal(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['savingsGoals'] });
+      setGoalModalOpen(false);
+      setEditingGoal(null);
+      resetForm();
+      toast({
+        title: "Goal updated",
+        description: "Your savings goal has been updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error updating goal",
+        description: error.message || "An error occurred while updating the goal",
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Delete goal mutation
+  const deleteGoalMutation = useMutation({
+    mutationFn: (goalId: string) => deleteSavingsGoal(goalId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['savingsGoals'] });
+      setDeleteGoalId(null);
+      toast({
+        title: "Goal deleted",
+        description: "Your savings goal has been deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error deleting goal",
+        description: error.message || "An error occurred while deleting the goal",
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Form handlers
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
   };
-
-  const handleEditGoal = (goal: Goal) => {
+  
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+  
+  const handleDateChange = (name: string, date: Date | undefined) => {
+    if (date) {
+      setFormData({
+        ...formData,
+        [name]: date.toISOString().split('T')[0]
+      });
+    }
+  };
+  
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      target_amount: "",
+      current_amount: "",
+      start_date: new Date().toISOString().split('T')[0],
+      target_date: addMonths(new Date(), 6).toISOString().split('T')[0],
+      category_id: "",
+    });
+  };
+  
+  // Open edit modal
+  const handleEditGoal = (goal: any) => {
     setEditingGoal(goal);
-    form.reset({
-      name: goal.name,
-      targetAmount: goal.targetAmount,
-      currentAmount: goal.currentAmount,
-      deadline: goal.deadline,
-      category: goal.category,
-      priority: goal.priority,
-    });
-    setIsAddOpen(true);
-  };
-
-  const handleDeleteGoal = (id: string) => {
-    const updatedGoals = goals.filter(goal => goal.id !== id);
-    setGoals(updatedGoals);
-    toast({
-      title: "Goal deleted",
-      description: "The financial goal has been deleted",
-    });
-  };
-
-  const calculateMonthlyContribution = (goal: Goal) => {
-    const remaining = goal.targetAmount - goal.currentAmount;
-    const today = new Date();
-    const monthsLeft = 
-      (goal.deadline.getFullYear() - today.getFullYear()) * 12 + 
-      (goal.deadline.getMonth() - today.getMonth());
     
-    return monthsLeft > 0 ? remaining / monthsLeft : remaining;
+    setFormData({
+      name: goal.name,
+      target_amount: String(goal.target_amount),
+      current_amount: String(goal.current_amount),
+      start_date: goal.start_date,
+      target_date: goal.target_date,
+      category_id: goal.category_id || "",
+    });
+    
+    setGoalModalOpen(true);
   };
-
-  const calculateProgress = (current: number, target: number) => {
-    return Math.min(Math.round((current / target) * 100), 100);
+  
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const goalData = {
+      name: formData.name,
+      target_amount: parseFloat(formData.target_amount),
+      current_amount: parseFloat(formData.current_amount || "0"),
+      start_date: formData.start_date,
+      target_date: formData.target_date,
+      category_id: formData.category_id || null,
+    };
+    
+    if (editingGoal) {
+      updateGoalMutation.mutate({
+        id: editingGoal.goal_id,
+        data: goalData
+      });
+    } else {
+      createGoalMutation.mutate(goalData);
+    }
   };
+  
+  // Handle delete goal
+  const handleDeleteGoal = () => {
+    if (deleteGoalId) {
+      deleteGoalMutation.mutate(deleteGoalId);
+    }
+  };
+  
+  // Filter goals based on active tab
+  const filteredGoals = goals ? goals.filter(goal => {
+    if (activeTab === "all") return true;
+    if (activeTab === "active") return !goal.is_completed;
+    if (activeTab === "completed") return goal.is_completed;
+    return true;
+  }) : [];
+  
+  // Check if there's any mutation in progress
+  const isSubmitting = createGoalMutation.isPending || updateGoalMutation.isPending || deleteGoalMutation.isPending;
 
   return (
     <PageTemplate 
-      title="Financial Goals" 
-      subtitle="Set and track your financial goals"
+      title="Savings Goals" 
+      subtitle="Track and manage your financial goals"
     >
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Your Goals</CardTitle>
-            <Sheet open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <SheetTrigger asChild>
-                <Button className="bg-spendwise-orange hover:bg-spendwise-orange/90">
-                  <Plus className="mr-2 h-4 w-4" /> Add New Goal
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>{editingGoal ? "Edit Goal" : "Create New Goal"}</SheetTitle>
-                  <SheetDescription>
-                    {editingGoal ? "Update your financial goal details" : "Set up a new financial goal with target and deadline"}
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="mt-6">
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Goal Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g., Emergency Fund" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="targetAmount"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Target Amount ($)</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="0.01" min="0" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="currentAmount"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Current Amount ($)</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="0.01" min="0" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              How much you've already saved towards this goal
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="deadline"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>Target Deadline</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                      "w-full pl-3 text-left font-normal",
-                                      !field.value && "text-muted-foreground"
-                                    )}
-                                  >
-                                    {field.value ? (
-                                      format(field.value, "PPP")
-                                    ) : (
-                                      <span>Pick a date</span>
-                                    )}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
-                                  disabled={(date) =>
-                                    date < new Date()
-                                  }
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="category"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Category</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a category" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="savings">Savings</SelectItem>
-                                <SelectItem value="purchase">Major Purchase</SelectItem>
-                                <SelectItem value="housing">Housing</SelectItem>
-                                <SelectItem value="travel">Travel</SelectItem>
-                                <SelectItem value="education">Education</SelectItem>
-                                <SelectItem value="retirement">Retirement</SelectItem>
-                                <SelectItem value="debt">Debt Repayment</SelectItem>
-                                <SelectItem value="other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="priority"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Priority</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select priority level" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="low">Low</SelectItem>
-                                <SelectItem value="medium">Medium</SelectItem>
-                                <SelectItem value="high">High</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex justify-end pt-4">
-                        <Button type="submit" className="bg-spendwise-orange hover:bg-spendwise-orange/90">
-                          {editingGoal ? "Update Goal" : "Create Goal"}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
+          <TabsList>
+            <TabsTrigger value="all">All Goals</TabsTrigger>
+            <TabsTrigger value="active">In Progress</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        <Button onClick={() => {
+          setEditingGoal(null);
+          resetForm();
+          setGoalModalOpen(true);
+        }}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Goal
+        </Button>
+      </div>
+      
+      {/* Goals List */}
+      {loadingGoals ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((index) => (
+            <Card key={index} className="animate-pulse">
+              <CardHeader>
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-2 w-full mb-2" />
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-12" />
                 </div>
-              </SheetContent>
-            </Sheet>
-          </CardHeader>
-          <CardContent>
-            {goals.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="bg-spendwise-orange/10 p-4 rounded-full mb-4">
-                  <Target size={48} className="text-spendwise-orange" />
-                </div>
-                <h2 className="text-xl font-semibold mb-2">No Goals Yet</h2>
-                <p className="text-gray-500 text-center max-w-md mb-6">
-                  Start setting financial goals to track your progress and stay motivated
-                </p>
-                <Button 
-                  className="bg-spendwise-orange hover:bg-spendwise-orange/90"
-                  onClick={() => setIsAddOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Add Your First Goal
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {goals.map((goal) => {
-                  const progress = calculateProgress(goal.currentAmount, goal.targetAmount);
-                  const monthlyContribution = calculateMonthlyContribution(goal);
-                  
-                  return (
-                    <div key={goal.id} className="border rounded-lg p-4">
-                      <div className="flex flex-wrap justify-between items-start gap-4 mb-3">
-                        <div className="flex-1 min-w-[200px]">
-                          <h3 className="text-lg font-medium">{goal.name}</h3>
-                          <div className="text-sm text-gray-500">
-                            Due by {format(goal.deadline, "PPP")}
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditGoal(goal)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-500 hover:text-red-600"
-                            onClick={() => handleDeleteGoal(goal.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+              </CardContent>
+              <CardFooter>
+                <Skeleton className="h-9 w-full" />
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      ) : filteredGoals.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredGoals.map(goal => {
+            const percentComplete = goal.progress_percentage || 0;
+            const formattedStartDate = format(new Date(goal.start_date), 'MMM d, yyyy');
+            const formattedTargetDate = format(new Date(goal.target_date), 'MMM d, yyyy');
+            
+            return (
+              <Card key={goal.goal_id} className={cn(
+                goal.is_completed ? "border-green-200 bg-green-50" : ""
+              )}>
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-spendwise-orange" />
+                      <span className="truncate">{goal.name}</span>
+                    </CardTitle>
+                    {goal.is_completed && (
+                      <span className="flex items-center text-green-600 text-sm font-medium">
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Completed
+                      </span>
+                    )}
+                  </div>
+                  <CardDescription>
+                    {goal.category_name ? `Category: ${goal.category_name}` : 'No category'}
+                  </CardDescription>
+                </CardHeader>
+                
+                <CardContent className="pb-2">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>${goal.current_amount.toLocaleString()} saved</span>
+                        <span className="font-medium">${goal.target_amount.toLocaleString()} goal</span>
                       </div>
-                      
-                      <div className="mb-3">
-                        <Progress value={progress} className="h-2" />
-                      </div>
-                      
-                      <div className="flex flex-wrap justify-between text-sm mb-3">
-                        <span className="font-medium">
-                          ${goal.currentAmount.toLocaleString()} of ${goal.targetAmount.toLocaleString()}
-                        </span>
-                        <span className={cn(
-                          "font-medium",
-                          progress === 100 ? "text-green-600" : ""
-                        )}>
-                          {progress}% {progress === 100 && <Check className="inline h-4 w-4" />}
-                        </span>
-                      </div>
-                      
-                      <div className="mt-4 text-sm">
-                        <div className="flex flex-wrap justify-between gap-2">
-                          <div>
-                            <span className="text-gray-500">Category: </span>
-                            <span className="capitalize">{goal.category}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500">Priority: </span>
-                            <span className={cn(
-                              "capitalize", 
-                              goal.priority === "high" ? "text-red-500" : 
-                              goal.priority === "medium" ? "text-amber-500" : 
-                              "text-blue-500"
-                            )}>
-                              {goal.priority}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="mt-2">
-                          <span className="text-gray-500">Suggested monthly contribution: </span>
-                          <span className="font-semibold">${monthlyContribution.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}</span>
-                        </div>
+                      <Progress value={percentComplete} className="h-2" />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Started: {formattedStartDate}</span>
+                        <span>Target: {formattedTargetDate}</span>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                </CardContent>
+                
+                <CardFooter className="pt-2">
+                  <div className="flex gap-2 w-full">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => handleEditGoal(goal)}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="icon"
+                      onClick={() => setDeleteGoalId(goal.goal_id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-12 border border-dashed border-gray-300 rounded-lg">
+          <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">No savings goals found</h3>
+          <p className="text-muted-foreground mb-4">
+            Start creating savings goals to track your financial progress
+          </p>
+          <Button onClick={() => {
+            setEditingGoal(null);
+            resetForm();
+            setGoalModalOpen(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Goal
+          </Button>
+        </div>
+      )}
+      
+      {/* Create/Edit Goal Modal */}
+      <Dialog open={goalModalOpen} onOpenChange={setGoalModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{editingGoal ? "Edit" : "Create"} Savings Goal</DialogTitle>
+            <DialogDescription>
+              {editingGoal 
+                ? "Update the details of your savings goal" 
+                : "Set up a new savings goal to track your progress"
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Goal Name</Label>
+              <Input 
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="e.g., New Car, Emergency Fund"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="target_amount">Target Amount ($)</Label>
+                <Input 
+                  id="target_amount"
+                  name="target_amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.target_amount}
+                  onChange={handleChange}
+                  placeholder="5000.00"
+                  required
+                />
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="current_amount">Current Amount ($)</Label>
+                <Input 
+                  id="current_amount"
+                  name="current_amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.current_amount}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Category (Optional)</Label>
+              <Select 
+                value={formData.category_id} 
+                onValueChange={(value) => handleSelectChange("category_id", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {categories && categories.map(category => (
+                    <SelectItem key={category.category_id} value={category.category_id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.start_date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.start_date ? format(new Date(formData.start_date), 'PP') : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.start_date ? new Date(formData.start_date) : undefined}
+                      onSelect={(date) => handleDateChange("start_date", date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Target Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.target_date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.target_date ? format(new Date(formData.target_date), 'PP') : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.target_date ? new Date(formData.target_date) : undefined}
+                      onSelect={(date) => handleDateChange("target_date", date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setGoalModalOpen(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <span className="animate-spin mr-2">●</span>}
+                {editingGoal ? "Update" : "Create"} Goal
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Goal Confirmation */}
+      <AlertDialog open={!!deleteGoalId} onOpenChange={(open) => !open && setDeleteGoalId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Savings Goal</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this savings goal? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteGoal}
+              disabled={isSubmitting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isSubmitting && <span className="animate-spin mr-2">●</span>}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageTemplate>
   );
 }
