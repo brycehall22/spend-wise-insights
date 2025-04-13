@@ -82,12 +82,21 @@ export const createSavingsGoal = async (goalData: Partial<SavingsGoal>): Promise
     throw new Error('User must be logged in to create a savings goal');
   }
   
+  // Validate required fields
+  if (!goalData.name || !goalData.target_amount || !goalData.start_date || !goalData.target_date) {
+    throw new Error('Name, target amount, start date, and target date are required');
+  }
+  
   const { data, error } = await supabase
     .from('savings_goals')
     .insert({
-      ...goalData,
       user_id: userId,
+      name: goalData.name,
+      target_amount: goalData.target_amount,
       current_amount: goalData.current_amount || 0,
+      start_date: goalData.start_date,
+      target_date: goalData.target_date,
+      category_id: goalData.category_id || null,
       is_completed: goalData.is_completed || false
     })
     .select()
@@ -109,9 +118,20 @@ export const updateSavingsGoal = async (goalId: string, goalData: Partial<Saving
     throw new Error('User must be logged in to update a savings goal');
   }
   
+  // Create an update object with only valid fields
+  const updateData: Record<string, any> = {};
+  
+  if (goalData.name !== undefined) updateData.name = goalData.name;
+  if (goalData.target_amount !== undefined) updateData.target_amount = goalData.target_amount;
+  if (goalData.current_amount !== undefined) updateData.current_amount = goalData.current_amount;
+  if (goalData.start_date !== undefined) updateData.start_date = goalData.start_date;
+  if (goalData.target_date !== undefined) updateData.target_date = goalData.target_date;
+  if (goalData.category_id !== undefined) updateData.category_id = goalData.category_id;
+  if (goalData.is_completed !== undefined) updateData.is_completed = goalData.is_completed;
+  
   const { data, error } = await supabase
     .from('savings_goals')
-    .update(goalData)
+    .update(updateData)
     .eq('user_id', userId)
     .eq('goal_id', goalId)
     .select()
