@@ -59,17 +59,19 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   const transactions = [];
   if (data) {
     for (const item of data) {
+      // Type assertion to handle complex structure from Supabase
+      const rawItem: any = item;
       const transaction = {
-        id: item.transaction_id,
-        date: item.transaction_date,
-        description: item.description,
-        merchant: item.merchant,
-        amount: item.amount,
-        currency: item.currency,
-        category: item.categories?.name || 'Uncategorized',
-        account: item.accounts?.account_name || 'Unknown',
-        status: item.status,
-        is_flagged: item.is_flagged ?? false
+        id: rawItem.transaction_id,
+        date: rawItem.transaction_date,
+        description: rawItem.description,
+        merchant: rawItem.merchant,
+        amount: rawItem.amount,
+        currency: rawItem.currency,
+        category: rawItem.categories?.name || 'Uncategorized',
+        account: rawItem.accounts?.account_name || 'Unknown',
+        status: rawItem.status,
+        is_flagged: rawItem.is_flagged ?? false
       };
       transactions.push(transaction);
     }

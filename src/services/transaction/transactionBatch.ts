@@ -21,12 +21,9 @@ export const batchUpdateCategory = async (transactionIds: string[], categoryId: 
 };
 
 export const flagTransaction = async (transactionId: string, isFlagged: boolean): Promise<Transaction> => {
-  // Create a properly typed update object that matches the expected types
-  const updateData: { is_flagged?: boolean } = { is_flagged: isFlagged };
-  
   const { data, error } = await supabase
     .from('transactions')
-    .update(updateData)
+    .update({ is_flagged: isFlagged })
     .eq('transaction_id', transactionId)
     .select()
     .single();
