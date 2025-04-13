@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   DbTransaction, 
@@ -87,10 +86,10 @@ export const getTransactions = async (
   
   if (error) throw error;
   
-  // Format the results - Using type assertion to avoid deep recursion
-  const transactions: Transaction[] = (data || []).map((item: any) => {
-    // Create a transaction object with properly defined types
-    const transaction: Transaction = {
+  // Transform data with explicit typing to avoid deep recursion
+  const transactions: Transaction[] = (data || []).map((row) => {
+    const item = row as unknown as DbTransactionWithRelations;
+    return {
       transaction_id: item.transaction_id,
       user_id: item.user_id,
       account_id: item.account_id,
@@ -101,14 +100,12 @@ export const getTransactions = async (
       merchant: item.merchant,
       transaction_date: item.transaction_date,
       status: item.status,
-      is_flagged: item.is_flagged ?? false, // Use nullish coalescing to handle undefined
+      is_flagged: item.is_flagged ?? false,
       created_at: item.created_at,
       updated_at: item.updated_at,
       category_name: item.categories?.name,
       account_name: item.accounts?.account_name
     };
-    
-    return transaction;
   });
   
   // Calculate total pages
@@ -141,23 +138,26 @@ export const getTransactionById = async (transactionId: string): Promise<Transac
   
   if (!data) return null;
   
+  // Use type assertion to handle the complex structure
+  const item = data as unknown as DbTransactionWithRelations;
+  
   // Create transaction with correct typing
   const transaction: Transaction = {
-    transaction_id: data.transaction_id,
-    user_id: data.user_id,
-    account_id: data.account_id,
-    category_id: data.category_id,
-    amount: data.amount,
-    currency: data.currency,
-    description: data.description,
-    merchant: data.merchant,
-    transaction_date: data.transaction_date,
-    status: data.status,
-    is_flagged: data.is_flagged ?? false, // Use nullish coalescing to handle undefined
-    created_at: data.created_at,
-    updated_at: data.updated_at,
-    category_name: data.categories?.name,
-    account_name: data.accounts?.account_name
+    transaction_id: item.transaction_id,
+    user_id: item.user_id,
+    account_id: item.account_id,
+    category_id: item.category_id,
+    amount: item.amount,
+    currency: item.currency,
+    description: item.description,
+    merchant: item.merchant,
+    transaction_date: item.transaction_date,
+    status: item.status,
+    is_flagged: item.is_flagged ?? false,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    category_name: item.categories?.name,
+    account_name: item.accounts?.account_name
   };
   
   return transaction;
@@ -186,10 +186,10 @@ export const createTransaction = async (transaction: Omit<DbTransaction, "transa
   
   if (error) throw error;
   
-  // Make sure to cast data to Transaction and set is_flagged if not present
+  // Use type casting to ensure proper typing
   return {
-    ...data,
-    is_flagged: data.is_flagged ?? false
+    ...(data as DbTransaction),
+    is_flagged: (data as any).is_flagged ?? false
   } as Transaction;
 };
 
@@ -203,10 +203,10 @@ export const updateTransaction = async (transaction: Partial<DbTransaction> & { 
   
   if (error) throw error;
   
-  // Make sure to cast data to Transaction and set is_flagged if not present
+  // Use type casting to ensure proper typing
   return {
-    ...data,
-    is_flagged: data.is_flagged ?? false
+    ...(data as DbTransaction),
+    is_flagged: (data as any).is_flagged ?? false
   } as Transaction;
 };
 
@@ -232,13 +232,11 @@ export const flagTransaction = async (transactionId: string, isFlagged: boolean)
   
   if (error) throw error;
   
-  // Explicitly cast and handle the is_flagged field
-  const transaction: Transaction = {
-    ...data,
-    is_flagged: data.is_flagged ?? false
+  // Use type casting to ensure proper typing
+  return {
+    ...(data as DbTransaction),
+    is_flagged: (data as any).is_flagged ?? false
   } as Transaction;
-  
-  return transaction;
 };
 
 export const batchDeleteTransactions = async (transactionIds: string[]): Promise<void> => {
@@ -312,9 +310,10 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   
   if (error) throw error;
   
-  // Format data - Using type assertion to avoid deep recursion
-  const transactions = (data || []).map((item: any) => {
-    const transaction: any = {
+  // Transform data with explicit typing to avoid deep recursion
+  const transactions = (data || []).map((row) => {
+    const item = row as unknown as DbTransactionWithRelations;
+    return {
       id: item.transaction_id,
       date: item.transaction_date,
       description: item.description,
@@ -324,10 +323,8 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
       category: item.categories?.name || 'Uncategorized',
       account: item.accounts?.account_name || 'Unknown',
       status: item.status,
-      is_flagged: item.is_flagged ?? false // Use nullish coalescing to handle undefined
+      is_flagged: item.is_flagged ?? false
     };
-    
-    return transaction;
   });
   
   // Format based on export type
