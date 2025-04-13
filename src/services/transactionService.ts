@@ -87,8 +87,7 @@ export const getTransactions = async (
   if (error) throw error;
   
   // Transform data with explicit typing to avoid deep recursion
-  const transactions: Transaction[] = (data || []).map((row) => {
-    const item = row as unknown as DbTransactionWithRelations;
+  const transactions: Transaction[] = (data || []).map((item: any) => {
     return {
       transaction_id: item.transaction_id,
       user_id: item.user_id,
@@ -139,7 +138,7 @@ export const getTransactionById = async (transactionId: string): Promise<Transac
   if (!data) return null;
   
   // Use type assertion to handle the complex structure
-  const item = data as unknown as DbTransactionWithRelations;
+  const item = data as any;
   
   // Create transaction with correct typing
   const transaction: Transaction = {
@@ -232,10 +231,11 @@ export const flagTransaction = async (transactionId: string, isFlagged: boolean)
   
   if (error) throw error;
   
-  // Use type casting to ensure proper typing
+  // Use type assertion to ensure proper typing
+  const item = data as any;
   return {
-    ...(data as DbTransaction),
-    is_flagged: (data as any).is_flagged ?? false
+    ...item,
+    is_flagged: item.is_flagged ?? false
   } as Transaction;
 };
 
@@ -311,8 +311,7 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   if (error) throw error;
   
   // Transform data with explicit typing to avoid deep recursion
-  const transactions = (data || []).map((row) => {
-    const item = row as unknown as DbTransactionWithRelations;
+  const transactions = (data || []).map((item: any) => {
     return {
       id: item.transaction_id,
       date: item.transaction_date,
