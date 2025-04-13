@@ -48,7 +48,7 @@ export type DbTransaction = {
   merchant: string;
   transaction_date: string;
   status: string;
-  is_flagged?: boolean;
+  is_flagged?: boolean;  // Making sure is_flagged exists and is optional
   created_at: string;
   updated_at: string;
 };
@@ -57,6 +57,28 @@ export type Transaction = DbTransaction & {
   category_name?: string;
   account_name?: string;
 };
+
+// Define the shape of the joined table data returned from Supabase
+export interface DbTransactionWithRelations {
+  // Basic transaction fields
+  transaction_id: string;
+  user_id: string;
+  account_id: string;
+  category_id?: string | null;
+  amount: number;
+  currency: string;
+  description: string;
+  merchant: string;
+  transaction_date: string;
+  status: string;
+  is_flagged?: boolean;  // Making sure is_flagged exists and is optional
+  created_at: string;
+  updated_at: string;
+  
+  // Join data
+  categories?: { name: string } | null;
+  accounts?: { account_name: string; currency: string } | null;
+}
 
 export type DbBudget = {
   budget_id: string;
@@ -113,10 +135,4 @@ export interface FinancialSummary {
   averageTransaction: number;
   income: number;
   expenses: number;
-}
-
-// Define the type for database transaction records including join tables
-export interface DbTransactionWithRelations extends DbTransaction {
-  categories?: { name: string };
-  accounts?: { account_name: string; currency: string };
 }

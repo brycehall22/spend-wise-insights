@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   DbTransaction, 
@@ -86,7 +87,7 @@ export const getTransactions = async (
   
   if (error) throw error;
   
-  // Format the results
+  // Format the results - Using type assertion to avoid deep recursion
   const transactions: Transaction[] = (data || []).map((item: any) => {
     // Create a transaction object with properly defined types
     const transaction: Transaction = {
@@ -100,7 +101,7 @@ export const getTransactions = async (
       merchant: item.merchant,
       transaction_date: item.transaction_date,
       status: item.status,
-      is_flagged: item.is_flagged || false,
+      is_flagged: item.is_flagged ?? false, // Use nullish coalescing to handle undefined
       created_at: item.created_at,
       updated_at: item.updated_at,
       category_name: item.categories?.name,
@@ -152,7 +153,7 @@ export const getTransactionById = async (transactionId: string): Promise<Transac
     merchant: data.merchant,
     transaction_date: data.transaction_date,
     status: data.status,
-    is_flagged: data.is_flagged || false,
+    is_flagged: data.is_flagged ?? false, // Use nullish coalescing to handle undefined
     created_at: data.created_at,
     updated_at: data.updated_at,
     category_name: data.categories?.name,
@@ -185,7 +186,11 @@ export const createTransaction = async (transaction: Omit<DbTransaction, "transa
   
   if (error) throw error;
   
-  return data as Transaction;
+  // Make sure to cast data to Transaction and set is_flagged if not present
+  return {
+    ...data,
+    is_flagged: data.is_flagged ?? false
+  } as Transaction;
 };
 
 export const updateTransaction = async (transaction: Partial<DbTransaction> & { transaction_id: string }): Promise<Transaction> => {
@@ -198,7 +203,11 @@ export const updateTransaction = async (transaction: Partial<DbTransaction> & { 
   
   if (error) throw error;
   
-  return data as Transaction;
+  // Make sure to cast data to Transaction and set is_flagged if not present
+  return {
+    ...data,
+    is_flagged: data.is_flagged ?? false
+  } as Transaction;
 };
 
 export const deleteTransaction = async (transactionId: string): Promise<void> => {
@@ -226,7 +235,7 @@ export const flagTransaction = async (transactionId: string, isFlagged: boolean)
   // Explicitly cast and handle the is_flagged field
   const transaction: Transaction = {
     ...data,
-    is_flagged: data.is_flagged || false
+    is_flagged: data.is_flagged ?? false
   } as Transaction;
   
   return transaction;
@@ -303,7 +312,7 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   
   if (error) throw error;
   
-  // Format data
+  // Format data - Using type assertion to avoid deep recursion
   const transactions = (data || []).map((item: any) => {
     const transaction: any = {
       id: item.transaction_id,
@@ -315,7 +324,7 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
       category: item.categories?.name || 'Uncategorized',
       account: item.accounts?.account_name || 'Unknown',
       status: item.status,
-      is_flagged: item.is_flagged || false
+      is_flagged: item.is_flagged ?? false // Use nullish coalescing to handle undefined
     };
     
     return transaction;
