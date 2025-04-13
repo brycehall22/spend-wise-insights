@@ -12,15 +12,18 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   }
   
   // Build query with filters but no pagination
-  let query = supabase
+  // Important: Use type assertion to break deep type inference chain
+  const baseQuery = supabase
     .from('transactions')
     .select(`
       *,
       categories (name),
       accounts (account_name, currency)
-    `)
-    .eq('user_id', userId);
-
+    `) as any;
+    
+  // Continue with a query that has broken the type recursion
+  let query = baseQuery.eq('user_id', userId);
+    
   // Apply filters
   if (filters.startDate) {
     query = query.gte('transaction_date', filters.startDate);
@@ -55,12 +58,11 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
   
   if (error) throw error;
   
-  // Transform data to a simpler format to avoid deep recursion issues
+  // Transform data to a simpler format
   const transactions: Array<Record<string, any>> = [];
   
   if (data) {
-    for (const item of data) {
-      // Use explicit property assignment without spreads to avoid type recursion
+    for (const item of data as any[]) {
       const transaction: Record<string, any> = {
         id: item.transaction_id,
         date: item.transaction_date,
@@ -73,7 +75,7 @@ export const exportTransactions = async (format: 'csv' | 'json', filters: Transa
         status: item.status
       };
       
-      // Safely handle is_flagged property whether it exists or not
+      // Safely handle is_flagged property
       transaction.is_flagged = 'is_flagged' in item ? item.is_flagged : false;
       
       transactions.push(transaction);
