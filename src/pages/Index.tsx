@@ -21,7 +21,6 @@ export default function Index() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
               <div>
                 <h1 className="text-2xl font-bold text-spendwise-oxford">Financial Dashboard</h1>
-                <p className="text-sm text-gray-500">Welcome back, John! Here's your financial overview.</p>
               </div>
               
               <div className="mt-4 sm:mt-0 flex space-x-2">

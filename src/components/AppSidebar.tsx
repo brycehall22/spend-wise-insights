@@ -82,7 +82,7 @@ export default function AppSidebar() {
         <div className="flex h-full flex-col">
           <div className="flex items-center h-16 px-6 border-b">
             <Link to="/" className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-spendwise-oxford">SpendWise</span>
+              <span className="text-2xl font-bold text-spendwise-oxford">Budget App</span>
             </Link>
           </div>
           
