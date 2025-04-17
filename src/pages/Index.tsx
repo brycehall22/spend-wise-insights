@@ -1,4 +1,6 @@
 
+import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import AppSidebar from "@/components/AppSidebar";
 import BudgetProgress from "@/components/dashboard/BudgetProgress";
 import FinancialInsights from "@/components/dashboard/FinancialInsights";
@@ -11,6 +13,20 @@ import SubscriptionsWidget from "@/components/dashboard/SubscriptionsWidget";
 import QuickAddTransaction from "@/components/dashboard/QuickAddTransaction";
 
 export default function Index() {
+  const { user } = useAuth();
+  const [userName, setUserName] = useState<string>("");
+  
+  useEffect(() => {
+    if (user) {
+      // Get user's name from metadata or email
+      const fullName = user.user_metadata?.full_name;
+      const firstName = user.user_metadata?.first_name || fullName?.split(' ')?.[0];
+      
+      // If we have a name, use it, otherwise use the email
+      setUserName(firstName || user.email?.split('@')?.[0] || "");
+    }
+  }, [user]);
+
   return (
     <div className="min-h-screen bg-spendwise-platinum">
       <AppSidebar />
@@ -21,7 +37,9 @@ export default function Index() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
               <div>
                 <h1 className="text-2xl font-bold text-spendwise-oxford">Financial Dashboard</h1>
-                <p className="text-sm text-gray-500">Welcome back, John! Here's your financial overview.</p>
+                <p className="text-sm text-gray-500">
+                  Welcome back{userName ? `, ${userName}` : ""}! Here's your financial overview.
+                </p>
               </div>
               
               <div className="mt-4 sm:mt-0 flex space-x-2">
