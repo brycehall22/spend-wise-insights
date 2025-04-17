@@ -81,26 +81,24 @@ export const getTransactions = async (
   
   if (error) throw error;
   
-  // Transform data with explicit typing to avoid deep recursion
-  const transactions: Transaction[] = (data || []).map((item: any) => {
-    return {
-      transaction_id: item.transaction_id,
-      user_id: item.user_id,
-      account_id: item.account_id,
-      category_id: item.category_id,
-      amount: item.amount,
-      currency: item.currency || (item.accounts?.currency || ''),
-      description: item.description,
-      merchant: item.merchant,
-      transaction_date: item.transaction_date,
-      status: item.status,
-      is_flagged: item.is_flagged ?? false,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      category_name: item.categories?.name,
-      account_name: item.accounts?.account_name
-    };
-  });
+  // Transform data to avoid deep recursion - fixing the excessive type instantiation error
+  const transactions: Transaction[] = (data || []).map((item: any) => ({
+    transaction_id: item.transaction_id,
+    user_id: item.user_id,
+    account_id: item.account_id,
+    category_id: item.category_id,
+    amount: item.amount,
+    currency: item.currency || (item.accounts?.currency || ''),
+    description: item.description,
+    merchant: item.merchant,
+    transaction_date: item.transaction_date,
+    status: item.status,
+    is_flagged: item.is_flagged ?? false,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    category_name: item.categories?.name,
+    account_name: item.accounts?.account_name
+  }));
   
   // Calculate total pages
   const totalPages = Math.ceil((count || 0) / pageSize);
