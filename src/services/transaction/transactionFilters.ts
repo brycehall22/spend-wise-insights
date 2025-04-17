@@ -1,5 +1,7 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Transaction, TransactionFilter } from "@/types/database.types";
+import { PostgrestFilterBuilder } from "@supabase/postgrest-js";
 
 interface PaginationResult {
   totalCount: number;
@@ -10,6 +12,9 @@ interface TransactionsResponse {
   transactions: Transaction[];
   pagination: PaginationResult;
 }
+
+// Define the type for the query to prevent deep type instantiation
+type TransactionQuery = PostgrestFilterBuilder<any, any, any>;
 
 export const getTransactions = async (
   page: number = 1, 
@@ -25,12 +30,12 @@ export const getTransactions = async (
   if (!userId) {
     throw new Error('User must be logged in to fetch transactions');
   }
-
+  
   // Calculate offset for pagination
   const offset = (page - 1) * pageSize;
   
-  // Start building the query
-  let query = supabase
+  // Start building the query with explicit type annotation
+  let query: TransactionQuery = supabase
     .from('transactions')
     .select(`
       *,
@@ -38,43 +43,51 @@ export const getTransactions = async (
       accounts (account_name, currency)
     `, { count: 'exact' })
     .eq('user_id', userId);
-
+  
   // Apply filters if provided
   if (filters.startDate) {
     query = query.gte('transaction_date', filters.startDate);
   }
+  
   if (filters.endDate) {
     query = query.lte('transaction_date', filters.endDate);
   }
+  
   if (filters.categoryId) {
     query = query.eq('category_id', filters.categoryId);
   }
+  
   if (filters.accountId) {
     query = query.eq('account_id', filters.accountId);
   }
+  
   if (filters.minAmount !== undefined) {
     query = query.gte('amount', filters.minAmount);
   }
+  
   if (filters.maxAmount !== undefined) {
     query = query.lte('amount', filters.maxAmount);
   }
+  
   if (filters.searchTerm) {
     query = query.or(`description.ilike.%${filters.searchTerm}%,merchant.ilike.%${filters.searchTerm}%`);
   }
+  
   if (filters.status) {
     query = query.eq('status', filters.status);
   }
+  
   if (filters.isFlagged !== undefined) {
     query = query.eq('is_flagged', filters.isFlagged);
   }
-
+  
   // Apply sorting
   const dbSortBy = sortBy === 'date' ? 'transaction_date' : sortBy;
   query = query.order(dbSortBy, { ascending: sortOrder === 'asc' });
-
+  
   // Apply pagination
   query = query.range(offset, offset + pageSize - 1);
-
+  
   // Execute the query
   const { data, error, count } = await query;
   
