@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Transaction, TransactionFilter } from "@/types/database.types";
 
@@ -81,14 +80,14 @@ export const getTransactions = async (
   
   if (error) throw error;
   
-  // Transform data to avoid deep recursion - fixing the excessive type instantiation error
-  const transactions: Transaction[] = (data || []).map((item: any) => ({
+  // Transform data with type assertion
+  const transactions = (data || []).map((item: any): Transaction => ({
     transaction_id: item.transaction_id,
     user_id: item.user_id,
     account_id: item.account_id,
     category_id: item.category_id,
     amount: item.amount,
-    currency: item.currency || (item.accounts?.currency || ''),
+    currency: item.currency || item.accounts?.currency || '',
     description: item.description,
     merchant: item.merchant,
     transaction_date: item.transaction_date,
