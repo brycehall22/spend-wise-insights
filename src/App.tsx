@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import Calendar from "./pages/Calendar";
 import Auth from "./pages/Auth";
 import { Toaster } from "./components/ui/toaster";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Create a React Query client
 const queryClient = new QueryClient({
@@ -21,27 +22,10 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },
 });
-
-// Protected route component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
-  
-  // If auth is still loading, show nothing or a spinner
-  if (isLoading) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>;
-  }
-  
-  // If no user is logged in, redirect to auth page
-  if (!user) {
-    return <Navigate to="/auth" />;
-  }
-  
-  // If user is logged in, render the children
-  return <>{children}</>;
-};
 
 function App() {
   return (

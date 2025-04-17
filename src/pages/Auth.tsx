@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { handleError } from "@/lib/utils";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -52,10 +53,11 @@ export default function Auth() {
   const { user } = useAuth();
   
   // Redirect if already logged in
-  if (user) {
-    navigate("/");
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -130,6 +132,18 @@ export default function Auth() {
       setIsLoading(false);
     }
   };
+
+  // If we're already logged in and waiting for redirect
+  if (user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-spendwise-orange" />
+          <p className="mt-2">Already logged in. Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
