@@ -16,6 +16,7 @@ export interface Subscription {
 }
 
 class SubscriptionService extends BaseService {
+  // Get upcoming subscriptions
   async getUpcomingSubscriptions(): Promise<Subscription[]> {
     return this.withAuth(async (userId) => {
       const { data, error } = await supabase
@@ -35,6 +36,7 @@ class SubscriptionService extends BaseService {
     });
   }
 
+  // Create a new subscription
   async createSubscription(subscription: Omit<Subscription, 'subscription_id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<Subscription> {
     return this.withAuth(async (userId) => {
       const { data, error } = await supabase
@@ -45,6 +47,43 @@ class SubscriptionService extends BaseService {
 
       if (error) throw error;
       return data;
+    });
+  }
+
+  // Create subscription from transaction
+  async createFromTransaction(transactionId: string): Promise<Subscription | null> {
+    return this.withAuth(async (userId) => {
+      // Get the transaction details
+      const { data: transaction, error: transactionError } = await supabase
+        .from('transactions')
+        .select(`
+          *,
+          categories (name)
+        `)
+        .eq('transaction_id', transactionId)
+        .single();
+
+      if (transactionError) throw transactionError;
+      if (!transaction) return null;
+
+      // Check if the category is "Subscriptions"
+      const isSubscription = transaction.categories?.name === 'Subscriptions';
+      if (!isSubscription) return null;
+
+      // Create a new subscription
+      const nextPaymentDate = new Date(transaction.transaction_date);
+      nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1); // Default to monthly
+
+      const subscription = {
+        name: transaction.description || transaction.merchant,
+        amount: Math.abs(transaction.amount),
+        next_payment: nextPaymentDate.toISOString(),
+        category_id: transaction.category_id,
+        billing_cycle: 'monthly',
+        is_active: true
+      };
+
+      return this.createSubscription(subscription);
     });
   }
 }
