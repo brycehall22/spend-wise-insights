@@ -3,31 +3,26 @@ import { useState } from "react";
 import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-
-// Mock data for accounts and categories
-const mockAccounts = [
-  { account_id: "acc1", account_name: "Checking Account" },
-  { account_id: "acc2", account_name: "Savings Account" },
-  { account_id: "acc3", account_name: "Credit Card" },
-];
-
-const mockCategories = [
-  { category_id: "cat1", name: "Groceries", is_income: false },
-  { category_id: "cat2", name: "Dining Out", is_income: false },
-  { category_id: "cat3", name: "Transportation", is_income: false },
-  { category_id: "cat4", name: "Utilities", is_income: false },
-  { category_id: "cat5", name: "Housing", is_income: false },
-  { category_id: "cat6", name: "Salary", is_income: true },
-  { category_id: "cat7", name: "Freelance", is_income: true },
-  { category_id: "cat8", name: "Investments", is_income: true },
-];
+import { useQuery } from "@tanstack/react-query";
+import { getCategories } from "@/services/categoryService";
+import { getAccounts } from "@/services/accountService";
 
 export default function QuickAddTransaction() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // Query categories and accounts
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => getCategories(),
+  });
 
-  const handleAddTransaction = (transactionData: any) => {
+  const { data: accounts } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: () => getAccounts(),
+  });
+
+  const handleTransactionAdded = (transactionData: any) => {
     console.log("Adding transaction:", transactionData);
-    // In a real app, you would dispatch this to Redux or make an API call
   };
 
   return (
@@ -42,10 +37,10 @@ export default function QuickAddTransaction() {
       <AddTransactionDialog
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        onAddTransaction={handleAddTransaction}
-        onTransactionAdded={handleAddTransaction}
-        accounts={mockAccounts}
-        categories={mockCategories}
+        onAddTransaction={handleTransactionAdded}
+        onTransactionAdded={handleTransactionAdded}
+        accounts={accounts || []}
+        categories={categories || []}
       />
     </>
   );

@@ -177,6 +177,45 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          amount: number
+          billing_cycle: string
+          category_id: string | null
+          created_at: string
+          is_active: boolean
+          name: string
+          next_payment: string
+          subscription_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          billing_cycle?: string
+          category_id?: string | null
+          created_at?: string
+          is_active?: boolean
+          name: string
+          next_payment: string
+          subscription_id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          billing_cycle?: string
+          category_id?: string | null
+          created_at?: string
+          is_active?: boolean
+          name?: string
+          next_payment?: string
+          subscription_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           account_id: string
@@ -185,6 +224,7 @@ export type Database = {
           created_at: string
           currency: string
           description: string
+          is_flagged: boolean | null
           merchant: string
           status: string
           transaction_date: string
@@ -199,6 +239,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description: string
+          is_flagged?: boolean | null
           merchant: string
           status?: string
           transaction_date: string
@@ -213,6 +254,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string
+          is_flagged?: boolean | null
           merchant?: string
           status?: string
           transaction_date?: string
