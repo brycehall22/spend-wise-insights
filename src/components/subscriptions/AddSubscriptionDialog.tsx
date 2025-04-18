@@ -54,6 +54,7 @@ export function AddSubscriptionDialog({ isOpen, onClose }: AddSubscriptionDialog
         billing_cycle: values.billing_cycle,
         next_payment: values.next_payment.toISOString(),
         is_active: true,
+        category_id: null, // Add this line to fix the TypeScript error
       });
       
       toast({

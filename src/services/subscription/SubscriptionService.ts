@@ -37,7 +37,7 @@ class SubscriptionService extends BaseService {
   }
 
   // Create a new subscription
-  async createSubscription(subscription: Omit<Subscription, 'subscription_id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<Subscription> {
+  async createSubscription(subscription: Omit<Subscription, 'subscription_id' | 'user_id' | 'created_at' | 'updated_at' | 'category_id'> & { category_id?: string | null }): Promise<Subscription> {
     return this.withAuth(async (userId) => {
       const { data, error } = await supabase
         .from('subscriptions')
