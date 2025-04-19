@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Account } from "@/types/database.types";
 import { mapDbAccountToAccount, transformResponse, transformSingleResponse } from "@/types/supabase";
@@ -35,7 +36,7 @@ export const getAccountById = async (accountId: string): Promise<Account | null>
   return response.data;
 };
 
-export const createAccount = async (account: Omit<Account, 'account_id' | 'created_at' | 'updated_at'>): Promise<Account> => {
+export const createAccount = async (account: Omit<Account, 'account_id' | 'created_at' | 'updated_at' | 'user_id'>): Promise<Account> => {
   // Get the current user's ID from the session
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user.id;

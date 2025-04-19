@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { DbCategory, Category } from "@/types/database.types";
 
@@ -44,7 +45,7 @@ export const getCategoryById = async (categoryId: string): Promise<Category | nu
   return data;
 };
 
-export const createCategory = async (category: Omit<Category, "category_id" | "created_at" | "updated_at">): Promise<Category> => {
+export const createCategory = async (category: Omit<Category, "category_id" | "created_at" | "updated_at" | "user_id">): Promise<Category> => {
   // Get the current user's ID from the session
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user.id;
