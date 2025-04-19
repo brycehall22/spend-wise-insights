@@ -45,7 +45,7 @@ export const getTransactionById = async (transactionId: string): Promise<Transac
   return transaction;
 };
 
-export const createTransaction = async (transaction: Omit<DbTransaction, "transaction_id" | "created_at" | "updated_at">): Promise<Transaction> => {
+export const createTransaction = async (transaction: Omit<DbTransaction, "transaction_id" | "created_at" | "updated_at" | "user_id">): Promise<Transaction> => {
   // Get the current user's ID from the session
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user.id;
