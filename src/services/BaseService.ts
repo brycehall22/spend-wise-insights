@@ -1,25 +1,20 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { withErrorHandling } from "@/utils/supabaseHelpers";
 
 export class BaseService {
   protected supabase = supabase;
-  
-  protected async getCurrentUserId(): Promise<string> {
-    const { data: { session } } = await this.supabase.auth.getSession();
-    const userId = session?.user?.id;
+
+  /**
+   * Helper method to run operations that require authentication
+   */
+  protected async withAuth<T>(callback: (userId: string) => Promise<T>): Promise<T> {
+    const { data: sessionData } = await this.supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
     
     if (!userId) {
-      throw new Error('User must be logged in');
+      throw new Error('User must be logged in to perform this operation');
     }
     
-    return userId;
-  }
-  
-  protected async withAuth<T>(operation: (userId: string) => Promise<T>): Promise<T> {
-    return withErrorHandling(async () => {
-      const userId = await this.getCurrentUserId();
-      return operation(userId);
-    });
+    return callback(userId);
   }
 }
