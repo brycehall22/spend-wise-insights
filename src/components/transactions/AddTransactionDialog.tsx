@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "@/lib/utils";
+import { AddAccountDialog } from "@/components/accounts/AddAccountDialog";
+import { AddCategoryDialog } from "@/components/categories/AddCategoryDialog";
 
 interface Account {
   account_id: string;
@@ -67,7 +68,9 @@ export function AddTransactionDialog({
   const handleTransactionAdded = onTransactionAdded ?? onAddTransaction ?? (() => {});
 
   const [transactionType, setTransactionType] = useState<"expense" | "income">("expense");
-  
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
@@ -186,6 +189,7 @@ export function AddTransactionDialog({
                         selected={field.value}
                         onSelect={field.onChange}
                         initialFocus
+                        className={cn("p-3 pointer-events-auto")}
                       />
                     </PopoverContent>
                   </Popover>
@@ -193,53 +197,81 @@ export function AddTransactionDialog({
               )}
             />
             
-            <FormField
-              control={form.control}
-              name="account_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Account</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select account" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {accounts.map((account) => (
-                        <SelectItem key={account.account_id} value={account.account_id}>
-                          {account.account_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
+            <div className="space-y-2">
+              <FormField
+                control={form.control}
+                name="account_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Account</FormLabel>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsAddAccountOpen(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Account
+                      </Button>
+                    </div>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.account_id} value={account.account_id}>
+                            {account.account_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             
-            <FormField
-              control={form.control}
-              name="category_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {filteredCategories.map((category) => (
-                        <SelectItem key={category.category_id} value={category.category_id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
+            <div className="space-y-2">
+              <FormField
+                control={form.control}
+                name="category_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Category</FormLabel>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsAddCategoryOpen(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Category
+                      </Button>
+                    </div>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {filteredCategories.map((category) => (
+                          <SelectItem key={category.category_id} value={category.category_id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             
             <FormField
               control={form.control}
@@ -261,6 +293,16 @@ export function AddTransactionDialog({
             </DialogFooter>
           </form>
         </Form>
+
+        <AddAccountDialog
+          isOpen={isAddAccountOpen}
+          onClose={() => setIsAddAccountOpen(false)}
+        />
+
+        <AddCategoryDialog
+          isOpen={isAddCategoryOpen}
+          onClose={() => setIsAddCategoryOpen(false)}
+        />
       </DialogContent>
     </Dialog>
   );
