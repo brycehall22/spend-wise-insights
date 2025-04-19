@@ -10,7 +10,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { getAccounts } from "@/services/accountService";
+import { createAccount } from "@/services/accountService";
+import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   account_name: z.string().min(1, "Account name is required"),
@@ -42,18 +43,13 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps) {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase
-        .from('accounts')
-        .insert([{
-          account_name: values.account_name,
-          account_type: values.account_type,
-          balance: parseFloat(values.balance),
-          currency: values.currency,
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
+      await createAccount({
+        account_name: values.account_name,
+        account_type: values.account_type,
+        balance: parseFloat(values.balance),
+        currency: values.currency,
+        is_active: true,
+      });
       
       toast({
         title: "Success",
