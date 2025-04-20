@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Account } from "@/types/database.types";
-import { mapDbAccountToAccount, transformResponse, transformSingleResponse } from "@/types/supabase";
 
 export const getAccounts = async (): Promise<Account[]> => {
   // Get the current user's ID from the session
@@ -12,13 +11,15 @@ export const getAccounts = async (): Promise<Account[]> => {
     throw new Error('User must be logged in to fetch accounts');
   }
   
-  const response = await supabase
+  const { data, error } = await supabase
     .from('accounts')
     .select('*')
     .eq('user_id', userId)
     .order('account_name', { ascending: true });
   
-  return transformResponse('accounts', response);
+  if (error) throw error;
+  
+  return data;
 };
 
 export const getAccountById = async (accountId: string): Promise<Account | null> => {
@@ -59,7 +60,7 @@ export const createAccount = async (account: Omit<Account, 'account_id' | 'creat
   
   if (error) throw error;
   
-  return mapDbAccountToAccount(data);
+  return data;
 };
 
 export const updateAccount = async (account: Partial<Account> & { account_id: string }): Promise<Account> => {
@@ -72,7 +73,7 @@ export const updateAccount = async (account: Partial<Account> & { account_id: st
   
   if (error) throw error;
   
-  return mapDbAccountToAccount(data);
+  return data;
 };
 
 export const deleteAccount = async (accountId: string): Promise<void> => {

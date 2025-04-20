@@ -1,22 +1,70 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import PageTemplate from './PageTemplate';
-import { Building, Plus } from 'lucide-react';
+import { Building, Plus, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useQuery } from '@tanstack/react-query';
-import { getAccounts } from '@/services/accountService';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getAccounts, deleteAccount } from '@/services/accountService';
+import { AddAccountDialog } from '@/components/accounts/AddAccountDialog';
+import { EditAccountDialog } from '@/components/accounts/EditAccountDialog';
 import EmptyState from '@/components/EmptyState';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
 
 export default function Accounts() {
+  const [isAddAccountDialogOpen, setIsAddAccountDialogOpen] = useState(false);
+  const [accountToEdit, setAccountToEdit] = useState<string | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   const { data: accounts, isLoading, error } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => getAccounts(),
   });
 
   const handleAddAccount = () => {
-    // Will be implemented in the future
-    console.log('Add account clicked');
+    setIsAddAccountDialogOpen(true);
+  };
+
+  const handleCloseAddAccountDialog = () => {
+    setIsAddAccountDialogOpen(false);
+  };
+
+  const handleEditAccount = (accountId: string) => {
+    setAccountToEdit(accountId);
+  };
+
+  const handleCloseEditDialog = () => {
+    setAccountToEdit(null);
+  };
+
+  const handleDeleteAccount = async (accountId: string) => {
+    try {
+      await deleteAccount(accountId);
+      toast({
+        title: "Account deleted",
+        description: "The account has been removed successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      setAccountToDelete(null);
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmDelete = (accountId: string) => {
+    setAccountToDelete(accountId);
+  };
+
+  const cancelDelete = () => {
+    setAccountToDelete(null);
   };
 
   return (
@@ -66,6 +114,28 @@ export default function Accounts() {
                   {account.account_type}
                 </div>
               </CardContent>
+              <CardFooter className="flex justify-end pt-2 pb-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleEditAccount(account.account_id)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600"
+                      onClick={() => confirmDelete(account.account_id)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardFooter>
             </Card>
           ))}
         </div>
@@ -78,6 +148,43 @@ export default function Accounts() {
           onAction={handleAddAccount}
         />
       )}
+
+      {/* Add Account Dialog */}
+      <AddAccountDialog 
+        isOpen={isAddAccountDialogOpen} 
+        onClose={handleCloseAddAccountDialog} 
+      />
+
+      {/* Edit Account Dialog */}
+      <EditAccountDialog
+        isOpen={!!accountToEdit}
+        onClose={handleCloseEditDialog}
+        accountId={accountToEdit}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!accountToDelete} onOpenChange={cancelDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Account</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this account? This action cannot be undone.
+              Any transactions associated with this account will remain in the system.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDelete}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => accountToDelete && handleDeleteAccount(accountToDelete)}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageTemplate>
   );
 }
