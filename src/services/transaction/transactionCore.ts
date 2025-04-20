@@ -12,17 +12,17 @@ export const getTransactionById = async (transactionId: string): Promise<Transac
     `)
     .eq('transaction_id', transactionId)
     .single();
-  
+
   if (error) {
     if (error.code === 'PGRST116') return null; // Not found
     throw error;
   }
-  
+
   if (!data) return null;
-  
+
   // Use type assertion to handle the complex structure
   const item = data as any;
-  
+
   // Create transaction with correct typing
   const transaction: Transaction = {
     transaction_id: item.transaction_id,
@@ -41,7 +41,7 @@ export const getTransactionById = async (transactionId: string): Promise<Transac
     category_name: item.categories?.name,
     account_name: item.accounts?.account_name
   };
-  
+
   return transaction;
 };
 
@@ -49,25 +49,25 @@ export const createTransaction = async (transaction: Omit<DbTransaction, "transa
   // Get the current user's ID from the session
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user.id;
-  
+
   if (!userId) {
     throw new Error('User must be logged in to create a transaction');
   }
-  
+
   // Ensure user_id is set
   const transactionWithUserId = {
     ...transaction,
     user_id: userId
   };
-  
+
   const { data, error } = await supabase
     .from('transactions')
     .insert(transactionWithUserId)
     .select()
     .single();
-  
+
   if (error) throw error;
-  
+
   // Use type assertion to ensure proper typing
   const item = data as any;
   return {
@@ -83,9 +83,9 @@ export const updateTransaction = async (transaction: Partial<DbTransaction> & { 
     .eq('transaction_id', transaction.transaction_id)
     .select()
     .single();
-  
+
   if (error) throw error;
-  
+
   // Use type assertion to ensure proper typing
   const item = data as any;
   return {
@@ -99,6 +99,7 @@ export const deleteTransaction = async (transactionId: string): Promise<void> =>
     .from('transactions')
     .delete()
     .eq('transaction_id', transactionId);
-  
+
   if (error) throw error;
 };
+

@@ -13,7 +13,7 @@ export default function QuickAddTransaction() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // Query categories and accounts
   const { data: categories } = useQuery({
     queryKey: ['categories'],
@@ -28,10 +28,10 @@ export default function QuickAddTransaction() {
   const handleTransactionAdded = async (transactionData: any) => {
     try {
       const { amount, description, date: transaction_date, account_id, category_id, notes, type } = transactionData;
-      
+
       // Adjust amount based on transaction type (negative for expense, positive for income)
       const adjustedAmount = type === 'expense' ? -Math.abs(amount) : Math.abs(amount);
-      
+
       // Create the transaction in the database
       const transaction = await createTransaction({
         account_id,
@@ -43,19 +43,20 @@ export default function QuickAddTransaction() {
         currency: 'USD', // Default currency
         status: 'cleared'
       });
-      
+
       // Show success toast
       toast({
         title: "Transaction added",
         description: `${type === 'expense' ? 'Expense' : 'Income'} of $${Math.abs(adjustedAmount)} added successfully`,
       });
-      
+
       // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['transactionStats'] });
       queryClient.invalidateQueries({ queryKey: ['accountBalances'] });
-      
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // Ensure accounts (balance) is refreshed
+
     } catch (error) {
       console.error("Error adding transaction:", error);
       toast({
@@ -68,13 +69,13 @@ export default function QuickAddTransaction() {
 
   return (
     <>
-      <Button 
+      <Button
         className="bg-spendwise-orange hover:bg-spendwise-orange/90 text-white flex items-center gap-1"
         onClick={() => setIsDialogOpen(true)}
       >
         <Plus size={16} /> Add Transaction
       </Button>
-      
+
       <AddTransactionDialog
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
@@ -86,3 +87,4 @@ export default function QuickAddTransaction() {
     </>
   );
 }
+
