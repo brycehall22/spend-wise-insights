@@ -18,6 +18,10 @@ import { format } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useQuery } from "@tanstack/react-query";
+import { getCategories } from "@/services/categoryService";
+import { budgetService } from "@/services/budget/BudgetService";
+import { useToast } from "@/hooks/use-toast";
 
 type CreateBudgetDialogProps = {
   open: boolean;
@@ -30,14 +34,52 @@ export default function CreateBudgetDialog({
   onOpenChange,
   onSave,
 }: CreateBudgetDialogProps) {
+  const { toast } = useToast();
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [budgetType, setBudgetType] = useState<string>("monthly");
-  const [budgetName, setBudgetName] = useState<string>("");
-  const [budgetTemplate, setBudgetTemplate] = useState<string>("new");
+  const [amount, setAmount] = useState<string>("");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => getCategories(),
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave();
+    if (!date || !amount || !categoryId) {
+      toast({
+        title: "Missing Fields",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await budgetService.createBudget({
+        month: format(date, 'yyyy-MM-dd'),
+        amount: parseFloat(amount),
+        category_id: categoryId,
+        notes,
+      });
+      
+      toast({
+        title: "Success",
+        description: "Budget has been created successfully.",
+      });
+      onSave();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create budget. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -53,36 +95,19 @@ export default function CreateBudgetDialog({
           
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="col-span-1">
-                Name
+              <Label htmlFor="amount" className="col-span-1">
+                Amount
               </Label>
               <Input
-                id="name"
+                id="amount"
+                type="number"
+                step="0.01"
                 className="col-span-3"
-                value={budgetName}
-                onChange={(e) => setBudgetName(e.target.value)}
-                placeholder="e.g., Monthly Budget April 2023"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Enter budget amount"
+                required
               />
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="period" className="col-span-1">
-                Type
-              </Label>
-              <Select
-                value={budgetType}
-                onValueChange={setBudgetType}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select budget type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="annual">Annual</SelectItem>
-                  <SelectItem value="custom">Custom Period</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             
             <div className="grid grid-cols-4 items-center gap-4">
@@ -114,20 +139,22 @@ export default function CreateBudgetDialog({
             </div>
             
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="template" className="col-span-1">
-                Template
+              <Label htmlFor="category" className="col-span-1">
+                Category
               </Label>
               <Select
-                value={budgetTemplate}
-                onValueChange={setBudgetTemplate}
+                value={categoryId}
+                onValueChange={setCategoryId}
               >
                 <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select template" />
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="new">Create New</SelectItem>
-                  <SelectItem value="previous">Copy from Previous Month</SelectItem>
-                  <SelectItem value="last-3-avg">Based on Last 3 Months Average</SelectItem>
+                  {categories?.map((category) => (
+                    <SelectItem key={category.category_id} value={category.category_id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -140,12 +167,16 @@ export default function CreateBudgetDialog({
                 id="notes"
                 className="col-span-3"
                 placeholder="Add any notes about this budget"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
               />
             </div>
           </div>
           
           <DialogFooter>
-            <Button type="submit">Create Budget</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Creating..." : "Create Budget"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

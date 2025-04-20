@@ -1,13 +1,24 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Edit, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getBudgets } from "@/services/budgetService";
 import EmptyState from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
+import { budgetService } from "@/services/budget/BudgetService";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type BudgetCategoryListProps = {
   month: Date;
@@ -15,6 +26,10 @@ type BudgetCategoryListProps = {
 };
 
 export default function BudgetCategoryList({ month, type }: BudgetCategoryListProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null);
+  
   const { 
     data: budgets, 
     isLoading, 
@@ -59,13 +74,31 @@ export default function BudgetCategoryList({ month, type }: BudgetCategoryListPr
     );
   }
 
+  const handleDelete = async (budgetId: string) => {
+    try {
+      await budgetService.deleteBudget(budgetId);
+      await queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      toast({
+        title: "Budget Deleted",
+        description: "The budget has been successfully deleted.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete the budget. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingBudgetId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {budgets.map((budget) => {
+      {budgets?.map((budget) => {
         const percentSpent = budget.spent ? (budget.spent / budget.amount) * 100 : 0;
         const remaining = budget.amount - (budget.spent || 0);
         
-        // Apply custom styling based on budget status
         const progressBarClass = remaining < 0 
           ? "bg-red-100" 
           : percentSpent > 90 
@@ -86,7 +119,12 @@ export default function BudgetCategoryList({ month, type }: BudgetCategoryListPr
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0"
+                  onClick={() => setDeletingBudgetId(budget.budget_id)}
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -110,11 +148,32 @@ export default function BudgetCategoryList({ month, type }: BudgetCategoryListPr
             
             <Progress 
               value={Math.min(percentSpent, 100)} 
-              className={cn("h-2", progressBarClass)} 
+              className={cn("h-2", progressBarClass)}
+              indicatorClassName={indicatorClass}
             />
           </div>
         );
       })}
+
+      <AlertDialog open={!!deletingBudgetId} onOpenChange={() => setDeletingBudgetId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this budget. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingBudgetId && handleDelete(deletingBudgetId)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
