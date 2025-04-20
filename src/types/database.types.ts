@@ -84,6 +84,7 @@ export type DbBudget = {
   category_id?: string | null;
   amount: number;
   month: string;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 };
