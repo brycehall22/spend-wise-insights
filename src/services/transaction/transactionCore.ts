@@ -102,4 +102,3 @@ export const deleteTransaction = async (transactionId: string): Promise<void> =>
 
   if (error) throw error;
 };
-
