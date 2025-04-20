@@ -18,23 +18,74 @@ import { useToast } from "@/components/ui/use-toast";
 import BudgetSummary from "@/components/budgets/BudgetSummary";
 import BudgetCategoryList from "@/components/budgets/BudgetCategoryList";
 import CreateBudgetDialog from "@/components/budgets/CreateBudgetDialog";
-import { format } from "date-fns";
+import { format, subMonths } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { useQueryClient } from "@tanstack/react-query";
+import { getBudgets, createBudget } from "@/services/budgetService";
 
 export default function Budgets() {
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>(new Date());
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
+  const queryClient = useQueryClient();
 
   const monthStr = selectedMonth ? format(selectedMonth, 'MMMM yyyy') : 'Select Month';
 
-  const handleCopyPreviousBudget = () => {
-    toast({
-      title: "Budget Copied",
-      description: "Previous month's budget has been copied to " + format(selectedMonth!, 'MMMM yyyy'),
-    });
+  // Handler for copying previous month's budget(s)
+  const handleCopyPreviousBudget = async () => {
+    if (!selectedMonth) return;
+    const prevMonthDate = subMonths(selectedMonth, 1);
+    try {
+      // Get previous month's budgets
+      const prevBudgets = await getBudgets(prevMonthDate);
+      if (!prevBudgets || prevBudgets.length === 0) {
+        toast({
+          title: "No Previous Budget",
+          description: "No budget found for the previous month to copy.",
+        });
+        return;
+      }
+      // Get current month's identifier for insertion
+      const currentMonthStr = format(selectedMonth, "yyyy-MM-dd");
+      // Copy each budget to new month (skip if there is already a budget for this category this month)
+      const currentBudgets = await getBudgets(selectedMonth);
+      const existingCategoryIds = new Set(currentBudgets.map((b: any) => b.category_id));
+      const toCopy = prevBudgets.filter(
+        (budget: any) => budget.category_id && !existingCategoryIds.has(budget.category_id)
+      );
+
+      if (toCopy.length === 0) {
+        toast({
+          title: "No Budgets to Copy",
+          description: "Budgets for these categories already exist this month.",
+        });
+        return;
+      }
+
+      for (const budget of toCopy) {
+        await createBudget({
+          amount: budget.amount,
+          month: currentMonthStr,
+          category_id: budget.category_id,
+          notes: budget.notes || "",
+        });
+      }
+      toast({
+        title: "Budget Copied",
+        description: `Copied ${toCopy.length} budget${toCopy.length > 1 ? "s" : ""} to ${format(selectedMonth, 'MMMM yyyy')}.`,
+      });
+      // Refresh budgets for the selected month
+      queryClient.invalidateQueries({ queryKey: ['budgets', format(selectedMonth, 'yyyy-MM')] });
+      queryClient.invalidateQueries({ queryKey: ['budgetSummary', format(selectedMonth, 'yyyy-MM')] });
+    } catch (err) {
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy budget. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -137,6 +188,11 @@ export default function Budgets() {
         open={showCreateDialog} 
         onOpenChange={setShowCreateDialog} 
         onSave={() => {
+          // Invalidate all affected queries so UI updates
+          if (selectedMonth) {
+            queryClient.invalidateQueries({ queryKey: ['budgets', format(selectedMonth, 'yyyy-MM')] });
+            queryClient.invalidateQueries({ queryKey: ['budgetSummary', format(selectedMonth, 'yyyy-MM')] });
+          }
           toast({
             title: "Budget Created",
             description: "Your new budget has been created successfully.",
