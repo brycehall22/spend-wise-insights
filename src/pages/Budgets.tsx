@@ -47,8 +47,10 @@ export default function Budgets() {
         });
         return;
       }
+      
       // Get current month's identifier for insertion
       const currentMonthStr = format(selectedMonth, "yyyy-MM-dd");
+      
       // Copy each budget to new month (skip if there is already a budget for this category this month)
       const currentBudgets = await getBudgets(selectedMonth);
       const existingCategoryIds = new Set(currentBudgets.map((b: any) => b.category_id));
@@ -72,14 +74,17 @@ export default function Budgets() {
           notes: budget.notes || "",
         });
       }
+      
       toast({
         title: "Budget Copied",
         description: `Copied ${toCopy.length} budget${toCopy.length > 1 ? "s" : ""} to ${format(selectedMonth, 'MMMM yyyy')}.`,
       });
+      
       // Refresh budgets for the selected month
       queryClient.invalidateQueries({ queryKey: ['budgets', format(selectedMonth, 'yyyy-MM')] });
       queryClient.invalidateQueries({ queryKey: ['budgetSummary', format(selectedMonth, 'yyyy-MM')] });
     } catch (err) {
+      console.error("Copy budget error:", err);
       toast({
         title: "Copy Failed",
         description: "Failed to copy budget. Please try again.",

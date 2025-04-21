@@ -26,6 +26,7 @@ export const getBudgets = async (date: Date): Promise<Budget[]> => {
     .eq('month', monthFormatted);
   
   if (budgetError) {
+    console.error("Budget fetch error:", budgetError);
     throw budgetError;
   }
   
@@ -44,6 +45,7 @@ export const getBudgets = async (date: Date): Promise<Budget[]> => {
     .lt('amount', 0); // Only expenses
   
   if (transactionError) {
+    console.error("Transaction fetch error:", transactionError);
     throw transactionError;
   }
   
@@ -123,7 +125,7 @@ export const createBudget = async (budgetData: Partial<Budget>): Promise<Budget>
     throw new Error('User must be logged in to create a budget');
   }
   
-  // FIX: Ensure all required fields are present
+  // Ensure all required fields are present
   if (!budgetData.amount || !budgetData.month) {
     throw new Error('Budget amount and month are required');
   }
@@ -135,11 +137,13 @@ export const createBudget = async (budgetData: Partial<Budget>): Promise<Budget>
       amount: budgetData.amount,
       month: budgetData.month,
       category_id: budgetData.category_id || null,
+      notes: budgetData.notes || null,
     })
     .select()
     .single();
   
   if (error) {
+    console.error("Budget creation error:", error);
     throw error;
   }
   
@@ -155,12 +159,13 @@ export const updateBudget = async (budgetId: string, budgetData: Partial<Budget>
     throw new Error('User must be logged in to update a budget');
   }
   
-  // FIX: Create an update object with only valid fields
+  // Create an update object with only valid fields
   const updateData: Record<string, any> = {};
   
   if (budgetData.amount !== undefined) updateData.amount = budgetData.amount;
   if (budgetData.category_id !== undefined) updateData.category_id = budgetData.category_id;
   if (budgetData.month !== undefined) updateData.month = budgetData.month;
+  if (budgetData.notes !== undefined) updateData.notes = budgetData.notes;
   
   const { data, error } = await supabase
     .from('budgets')
@@ -171,6 +176,7 @@ export const updateBudget = async (budgetId: string, budgetData: Partial<Budget>
     .single();
   
   if (error) {
+    console.error("Budget update error:", error);
     throw error;
   }
   
@@ -193,6 +199,7 @@ export const deleteBudget = async (budgetId: string): Promise<void> => {
     .eq('budget_id', budgetId);
   
   if (error) {
+    console.error("Budget deletion error:", error);
     throw error;
   }
 };

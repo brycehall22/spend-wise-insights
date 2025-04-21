@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery } from "@tanstack/react-query";
 import { getCategories } from "@/services/categoryService";
 import { budgetService } from "@/services/budget/BudgetService";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 type CreateBudgetDialogProps = {
   open: boolean;
@@ -41,9 +41,10 @@ export default function CreateBudgetDialog({
   const [notes, setNotes] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => getCategories(),
+  // Use useQuery to fetch only expense categories (is_income = false)
+  const { data: categories, isLoading: categoriesLoading } = useQuery({
+    queryKey: ['categories', 'expenses'],
+    queryFn: () => getCategories(false), // Pass false to get only expense categories
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,6 +73,7 @@ export default function CreateBudgetDialog({
       });
       onSave();
     } catch (error) {
+      console.error("Budget creation error:", error);
       toast({
         title: "Error",
         description: "Failed to create budget. Please try again.",
@@ -147,7 +149,7 @@ export default function CreateBudgetDialog({
                 onValueChange={setCategoryId}
               >
                 <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Select category"} />
                 </SelectTrigger>
                 <SelectContent>
                   {categories?.map((category) => (
