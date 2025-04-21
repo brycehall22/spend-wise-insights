@@ -22,7 +22,7 @@ import { format, subMonths } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useQueryClient } from "@tanstack/react-query";
-import { getBudgets, createBudget } from "@/services/budgetService";
+import { budgetService } from "@/services/budget/BudgetService";
 
 export default function Budgets() {
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>(new Date());
@@ -36,10 +36,15 @@ export default function Budgets() {
   // Handler for copying previous month's budget(s)
   const handleCopyPreviousBudget = async () => {
     if (!selectedMonth) return;
-    const prevMonthDate = subMonths(selectedMonth, 1);
+    
     try {
+      // Create a date for the previous month
+      const prevMonthDate = subMonths(selectedMonth, 1);
+      console.log("Copying budgets from:", format(prevMonthDate, 'MMMM yyyy'));
+      
       // Get previous month's budgets
-      const prevBudgets = await getBudgets(prevMonthDate);
+      const prevBudgets = await budgetService.getBudgets(prevMonthDate);
+      
       if (!prevBudgets || prevBudgets.length === 0) {
         toast({
           title: "No Previous Budget",
@@ -48,48 +53,73 @@ export default function Budgets() {
         return;
       }
       
-      // Get current month's identifier for insertion
-      const currentMonthStr = format(selectedMonth, "yyyy-MM-dd");
+      // Get current month's budgets to check for duplicates
+      const currentBudgets = await budgetService.getBudgets(selectedMonth);
       
-      // Copy each budget to new month (skip if there is already a budget for this category this month)
-      const currentBudgets = await getBudgets(selectedMonth);
-      const existingCategoryIds = new Set(currentBudgets.map((b: any) => b.category_id));
-      const toCopy = prevBudgets.filter(
-        (budget: any) => budget.category_id && !existingCategoryIds.has(budget.category_id)
+      // Create a set of category IDs that already have budgets for the current month
+      const existingCategoryIds = new Set(
+        currentBudgets.map((budget) => budget.category_id)
       );
-
-      if (toCopy.length === 0) {
+      
+      // Filter out budgets that already exist for this month
+      const budgetsToCopy = prevBudgets.filter(
+        (budget) => budget.category_id && !existingCategoryIds.has(budget.category_id)
+      );
+      
+      if (budgetsToCopy.length === 0) {
         toast({
           title: "No Budgets to Copy",
           description: "Budgets for these categories already exist this month.",
         });
         return;
       }
-
-      for (const budget of toCopy) {
-        await createBudget({
+      
+      console.log("Copying budgets:", budgetsToCopy);
+      
+      // Format the current month as YYYY-MM-DD (first day of month)
+      const firstDayOfSelectedMonth = new Date(
+        selectedMonth.getFullYear(),
+        selectedMonth.getMonth(),
+        1
+      );
+      const currentMonthStr = format(firstDayOfSelectedMonth, "yyyy-MM-dd");
+      
+      // Copy each budget to the new month
+      for (const budget of budgetsToCopy) {
+        await budgetService.createBudget({
           amount: budget.amount,
+          category_id: budget.category_id!,
           month: currentMonthStr,
-          category_id: budget.category_id,
           notes: budget.notes || "",
         });
       }
       
       toast({
-        title: "Budget Copied",
-        description: `Copied ${toCopy.length} budget${toCopy.length > 1 ? "s" : ""} to ${format(selectedMonth, 'MMMM yyyy')}.`,
+        title: "Budgets Copied",
+        description: `Copied ${budgetsToCopy.length} budget${
+          budgetsToCopy.length > 1 ? "s" : ""
+        } to ${format(selectedMonth, 'MMMM yyyy')}.`,
       });
       
-      // Refresh budgets for the selected month
-      queryClient.invalidateQueries({ queryKey: ['budgets', format(selectedMonth, 'yyyy-MM')] });
-      queryClient.invalidateQueries({ queryKey: ['budgetSummary', format(selectedMonth, 'yyyy-MM')] });
+      // Refresh queries
+      invalidateQueries();
+      
     } catch (err) {
       console.error("Copy budget error:", err);
       toast({
         title: "Copy Failed",
-        description: "Failed to copy budget. Please try again.",
+        description: "Failed to copy budgets. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+  
+  // Helper function to invalidate budget-related queries
+  const invalidateQueries = () => {
+    if (selectedMonth) {
+      const monthKey = format(selectedMonth, 'yyyy-MM');
+      queryClient.invalidateQueries({ queryKey: ['budgets', monthKey] });
+      queryClient.invalidateQueries({ queryKey: ['budgetSummary', monthKey] });
     }
   };
 
@@ -112,7 +142,15 @@ export default function Budgets() {
                 <Calendar
                   mode="single"
                   selected={selectedMonth}
-                  onSelect={setSelectedMonth}
+                  onSelect={(date) => {
+                    // If a date is selected, set it to the first day of that month
+                    if (date) {
+                      const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+                      setSelectedMonth(firstDayOfMonth);
+                    } else {
+                      setSelectedMonth(undefined);
+                    }
+                  }}
                   initialFocus
                 />
               </PopoverContent>
@@ -194,10 +232,8 @@ export default function Budgets() {
         onOpenChange={setShowCreateDialog} 
         onSave={() => {
           // Invalidate all affected queries so UI updates
-          if (selectedMonth) {
-            queryClient.invalidateQueries({ queryKey: ['budgets', format(selectedMonth, 'yyyy-MM')] });
-            queryClient.invalidateQueries({ queryKey: ['budgetSummary', format(selectedMonth, 'yyyy-MM')] });
-          }
+          invalidateQueries();
+          
           toast({
             title: "Budget Created",
             description: "Your new budget has been created successfully.",

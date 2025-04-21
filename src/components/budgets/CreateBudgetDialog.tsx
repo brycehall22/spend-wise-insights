@@ -40,28 +40,71 @@ export default function CreateBudgetDialog({
   const [categoryId, setCategoryId] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState<{
+    amount?: string;
+    date?: string;
+    category?: string;
+  }>({});
 
   // Use useQuery to fetch only expense categories (is_income = false)
   const { data: categories, isLoading: categoriesLoading } = useQuery({
     queryKey: ['categories', 'expenses'],
     queryFn: () => getCategories(false), // Pass false to get only expense categories
+    enabled: open, // Only fetch when dialog is open
   });
+
+  const validateForm = () => {
+    const errors: {
+      amount?: string;
+      date?: string;
+      category?: string;
+    } = {};
+    
+    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      errors.amount = "Please enter a valid amount greater than zero";
+    }
+    
+    if (!date) {
+      errors.date = "Please select a month";
+    }
+    
+    if (!categoryId) {
+      errors.category = "Please select a category";
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const resetForm = () => {
+    setAmount("");
+    setCategoryId("");
+    setNotes("");
+    setFormErrors({});
+    setDate(new Date());
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!date || !amount || !categoryId) {
-      toast({
-        title: "Missing Fields",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
+    
+    if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
     try {
+      // Ensure date is the first day of the month
+      const firstDayOfMonth = new Date(date!.getFullYear(), date!.getMonth(), 1);
+      
+      console.log("Creating budget with data:", {
+        month: format(firstDayOfMonth, 'yyyy-MM-dd'),
+        amount: parseFloat(amount),
+        category_id: categoryId,
+        notes,
+      });
+      
       await budgetService.createBudget({
-        month: format(date, 'yyyy-MM-dd'),
+        month: format(firstDayOfMonth, 'yyyy-MM-dd'),
         amount: parseFloat(amount),
         category_id: categoryId,
         notes,
@@ -71,6 +114,7 @@ export default function CreateBudgetDialog({
         title: "Success",
         description: "Budget has been created successfully.",
       });
+      resetForm();
       onSave();
     } catch (error) {
       console.error("Budget creation error:", error);
@@ -85,7 +129,12 @@ export default function CreateBudgetDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      if (!newOpen) {
+        resetForm();
+      }
+      onOpenChange(newOpen);
+    }}>
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
@@ -100,65 +149,87 @@ export default function CreateBudgetDialog({
               <Label htmlFor="amount" className="col-span-1">
                 Amount
               </Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                className="col-span-3"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Enter budget amount"
-                required
-              />
+              <div className="col-span-3">
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  className={cn(formErrors.amount && "border-red-500")}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Enter budget amount"
+                  required
+                />
+                {formErrors.amount && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.amount}</p>
+                )}
+              </div>
             </div>
             
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="col-span-1">
                 Month
               </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "col-span-3 justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "MMMM yyyy") : "Select a month"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="col-span-3">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !date && "text-muted-foreground",
+                        formErrors.date && "border-red-500"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {date ? format(date, "MMMM yyyy") : "Select a month"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      initialFocus
+                      disabled={(date) => {
+                        // Only allow selecting the first day of each month
+                        return date.getDate() !== 1;
+                      }}
+                      fromMonth={new Date(2000, 0)} // Allow selecting from year 2000
+                      toMonth={new Date(2100, 11)} // Allow selecting up to year 2100
+                    />
+                  </PopoverContent>
+                </Popover>
+                {formErrors.date && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.date}</p>
+                )}
+              </div>
             </div>
             
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="col-span-1">
                 Category
               </Label>
-              <Select
-                value={categoryId}
-                onValueChange={setCategoryId}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Select category"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories?.map((category) => (
-                    <SelectItem key={category.category_id} value={category.category_id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="col-span-3">
+                <Select
+                  value={categoryId}
+                  onValueChange={setCategoryId}
+                >
+                  <SelectTrigger className={cn(formErrors.category && "border-red-500")}>
+                    <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Select category"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories?.map((category) => (
+                      <SelectItem key={category.category_id} value={category.category_id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formErrors.category && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.category}</p>
+                )}
+              </div>
             </div>
             
             <div className="grid grid-cols-4 items-center gap-4">
@@ -168,7 +239,7 @@ export default function CreateBudgetDialog({
               <Textarea
                 id="notes"
                 className="col-span-3"
-                placeholder="Add any notes about this budget"
+                placeholder="Add any notes about this budget (optional)"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />

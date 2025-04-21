@@ -2,10 +2,19 @@
 import { BaseService } from "../BaseService";
 import { Budget } from "@/types/database.types";
 import { format } from "date-fns";
+import { toast } from "@/components/ui/use-toast";
 
 export class BudgetService extends BaseService {
   async createBudget(budget: Pick<Budget, 'amount' | 'category_id' | 'month' | 'notes'>): Promise<Budget> {
     return this.withAuth(async (userId) => {
+      // Validate required fields
+      if (!budget.amount || !budget.category_id || !budget.month) {
+        console.error("Budget creation error: Missing required fields", budget);
+        throw new Error("Missing required budget fields");
+      }
+
+      console.log("Creating budget:", { ...budget, user_id: userId });
+
       const { data, error } = await this.supabase
         .from('budgets')
         .insert({
@@ -19,6 +28,8 @@ export class BudgetService extends BaseService {
         console.error("Budget creation error in service:", error);
         throw error;
       }
+      
+      console.log("Budget created successfully:", data);
       return data;
     });
   }
@@ -60,6 +71,8 @@ export class BudgetService extends BaseService {
     return this.withAuth(async (userId) => {
       // Format the month as YYYY-MM-DD (first day of month)
       const monthFormatted = format(date, 'yyyy-MM-dd');
+      
+      console.log("Fetching budgets for month:", monthFormatted);
       
       // Get all budgets for the month
       const { data: budgets, error: budgetError } = await this.supabase
