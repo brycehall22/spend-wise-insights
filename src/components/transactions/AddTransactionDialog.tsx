@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "@/lib/utils";
 import { AddAccountDialog } from "@/components/accounts/AddAccountDialog";
 import { AddCategoryDialog } from "@/components/categories/AddCategoryDialog";
+import { createTransaction } from "@/services/transaction/transactionCore"; // Import directly from core
 
 interface Account {
   account_id: string;
@@ -70,6 +71,7 @@ export function AddTransactionDialog({
   const [transactionType, setTransactionType] = useState<"expense" | "income">("expense");
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -90,13 +92,54 @@ export function AddTransactionDialog({
     }
   }, [initialDate, form]);
 
-  const handleSubmit = (values: TransactionFormValues) => {
-    handleTransactionAdded({
-      ...values,
-      type: transactionType,
-    });
-    form.reset();
-    handleClose();
+  // Update account selection when accounts change
+  useEffect(() => {
+    if (accounts.length > 0 && !form.getValues("account_id")) {
+      form.setValue("account_id", accounts[0].account_id);
+    }
+  }, [accounts, form]);
+
+  const handleSubmit = async (values: TransactionFormValues) => {
+    try {
+      setIsSubmitting(true);
+      
+      const { amount, description, date, account_id, category_id, notes } = values;
+
+      // Adjust amount based on transaction type
+      // For income: positive amount
+      // For expense: negative amount
+      const adjustedAmount = transactionType === "expense" 
+        ? -Math.abs(amount)  // Make it negative for expense
+        : Math.abs(amount);  // Make it positive for income
+
+      console.log("Creating transaction with amount:", adjustedAmount, "Type:", transactionType);
+
+      // Create the transaction
+      const newTransaction = await createTransaction({
+        account_id,
+        category_id: category_id || null,
+        amount: adjustedAmount,
+        description,
+        merchant: description, // Default to description for merchant if not provided
+        transaction_date: date.toISOString().split('T')[0],
+        currency: "USD", // Default currency
+        status: "cleared",
+      });
+
+      // Notify parent about the new transaction
+      handleTransactionAdded({
+        ...newTransaction,
+        type: transactionType,
+      });
+
+      // Reset form and close dialog
+      form.reset();
+      handleClose();
+    } catch (error) {
+      console.error("Error creating transaction:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filteredCategories = categories.filter(
@@ -116,7 +159,18 @@ export function AddTransactionDialog({
             type="button"
             variant={transactionType === "expense" ? "default" : "outline"}
             className={transactionType === "expense" ? "bg-red-500 hover:bg-red-600" : ""}
-            onClick={() => setTransactionType("expense")}
+            onClick={() => {
+              setTransactionType("expense");
+              
+              // Update category if needed
+              const currentCategoryId = form.getValues("category_id");
+              if (currentCategoryId) {
+                const currentCategory = categories.find(c => c.category_id === currentCategoryId);
+                if (currentCategory?.is_income) {
+                  form.setValue("category_id", ""); // Clear category if it's an income category
+                }
+              }
+            }}
           >
             Expense
           </Button>
@@ -124,7 +178,18 @@ export function AddTransactionDialog({
             type="button"
             variant={transactionType === "income" ? "default" : "outline"}
             className={transactionType === "income" ? "bg-green-500 hover:bg-green-600" : ""}
-            onClick={() => setTransactionType("income")}
+            onClick={() => {
+              setTransactionType("income");
+              
+              // Update category if needed
+              const currentCategoryId = form.getValues("category_id");
+              if (currentCategoryId) {
+                const currentCategory = categories.find(c => c.category_id === currentCategoryId);
+                if (!currentCategory?.is_income) {
+                  form.setValue("category_id", ""); // Clear category if it's an expense category
+                }
+              }
+            }}
           >
             Income
           </Button>
@@ -139,8 +204,9 @@ export function AddTransactionDialog({
                 <FormItem>
                   <FormLabel>Amount ($)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="0.00" {...field} />
+                    <Input type="number" placeholder="0.00" step="0.01" {...field} />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -154,6 +220,7 @@ export function AddTransactionDialog({
                   <FormControl>
                     <Input placeholder="E.g. Grocery shopping" {...field} />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -193,6 +260,7 @@ export function AddTransactionDialog({
                       />
                     </PopoverContent>
                   </Popover>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -215,7 +283,7 @@ export function AddTransactionDialog({
                         Add Account
                       </Button>
                     </div>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select account" />
@@ -253,18 +321,24 @@ export function AddTransactionDialog({
                         Add Category
                       </Button>
                     </div>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {filteredCategories.map((category) => (
-                          <SelectItem key={category.category_id} value={category.category_id}>
-                            {category.name}
+                        {filteredCategories.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            No {transactionType} categories available
                           </SelectItem>
-                        ))}
+                        ) : (
+                          filteredCategories.map((category) => (
+                            <SelectItem key={category.category_id} value={category.category_id}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -282,13 +356,18 @@ export function AddTransactionDialog({
                   <FormControl>
                     <Textarea placeholder="Any additional details..." {...field} />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
             
             <DialogFooter>
-              <Button type="submit" className="bg-spendwise-orange hover:bg-spendwise-orange/90">
-                Add Transaction
+              <Button 
+                type="submit" 
+                className="bg-spendwise-orange hover:bg-spendwise-orange/90"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Adding..." : "Add Transaction"}
               </Button>
             </DialogFooter>
           </form>

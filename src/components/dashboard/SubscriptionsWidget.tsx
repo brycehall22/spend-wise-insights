@@ -1,20 +1,26 @@
-
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { CalendarClock, Plus } from "lucide-react";
 import { subscriptionService } from "@/services/subscription/SubscriptionService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import EmptyState from "@/components/EmptyState";
-import { useState } from "react";
-import { AddSubscriptionDialog } from "../subscriptions/AddSubscriptionDialog";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AddSubscriptionDialog } from "@/components/subscriptions/AddSubscriptionDialog";
 
 export default function SubscriptionsWidget() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
   
+  // Fetch upcoming subscriptions
   const { data: subscriptions, isLoading, error } = useQuery({
     queryKey: ['upcomingSubscriptions'],
     queryFn: () => subscriptionService.getUpcomingSubscriptions(),
   });
+
+  // Handle subscription added
+  const handleSubscriptionAdded = () => {
+    queryClient.invalidateQueries({ queryKey: ['upcomingSubscriptions'] });
+    setIsAddDialogOpen(false);
+  };
 
   // Loading state
   if (isLoading) {
@@ -48,17 +54,27 @@ export default function SubscriptionsWidget() {
   if (!subscriptions || subscriptions.length === 0) {
     return (
       <div className="budget-card animate-fade-in">
-        <h2 className="text-lg font-semibold mb-4 text-spendwise-oxford">Upcoming Subscriptions</h2>
-        <EmptyState
-          title="No Subscriptions Yet"
-          description="Track your recurring payments by adding your subscriptions"
-          icon={<CalendarClock className="h-6 w-6" />}
-          actionLabel="Add Subscription"
-          onAction={() => setIsAddDialogOpen(true)}
-        />
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold text-spendwise-oxford">Upcoming Subscriptions</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsAddDialogOpen(true)}
+            className="flex items-center gap-1"
+          >
+            <Plus className="h-4 w-4" /> Add
+          </Button>
+        </div>
+        <div className="p-6 flex flex-col items-center justify-center text-center border border-dashed border-gray-300 rounded-lg">
+          <CalendarClock size={32} className="text-gray-400 mb-2" />
+          <p className="text-gray-500">No upcoming subscriptions</p>
+          <p className="text-sm text-gray-400 mt-1">Add subscriptions to track your recurring payments</p>
+        </div>
+        
         <AddSubscriptionDialog 
           isOpen={isAddDialogOpen} 
-          onClose={() => setIsAddDialogOpen(false)} 
+          onClose={() => setIsAddDialogOpen(false)}
+          onSave={handleSubscriptionAdded}
         />
       </div>
     );
@@ -89,7 +105,7 @@ export default function SubscriptionsWidget() {
           // Calculate days remaining
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          const paymentDay = new Date(subscription.next_payment);
+          const paymentDay = new Date(nextPaymentDate);
           paymentDay.setHours(0, 0, 0, 0);
           
           const daysRemaining = Math.ceil((paymentDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -126,6 +142,7 @@ export default function SubscriptionsWidget() {
       <AddSubscriptionDialog 
         isOpen={isAddDialogOpen} 
         onClose={() => setIsAddDialogOpen(false)} 
+        onSave={handleSubscriptionAdded}
       />
     </div>
   );

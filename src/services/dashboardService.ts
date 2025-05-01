@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { format, subMonths } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
 export interface DashboardSummary {
   income: number;
@@ -13,6 +13,15 @@ export interface CategorySpending {
   category: string;
   amount: number;
   color?: string;
+}
+
+export interface MonthlySnapshot {
+  totalIncome: number;
+  totalExpenses: number;
+  netSavings: number;
+  savingRate: number;
+  avgDailySpending: number;
+  month: string;
 }
 
 // Function to get financial summary for dashboard
@@ -340,4 +349,93 @@ export const getFinancialInsights = async (): Promise<any[]> => {
   }
   
   return insights;
+};
+
+// Function to get monthly snapshot with proper error handling and default values
+export const getMonthlySnapshot = async () => {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    
+    if (!userId) {
+      throw new Error('User must be logged in to fetch financial snapshot');
+    }
+    
+    // Calculate current month bounds
+    const currentDate = new Date();
+    const firstDay = startOfMonth(currentDate);
+    const lastDay = endOfMonth(currentDate);
+    
+    // Format dates for query
+    const startDateStr = format(firstDay, 'yyyy-MM-dd');
+    const endDateStr = format(lastDay, 'yyyy-MM-dd');
+    
+    // Get all transactions for the month
+    const { data: transactions, error } = await supabase
+      .from('transactions')
+      .select('amount, transaction_date, categories(is_income)')
+      .eq('user_id', userId)
+      .gte('transaction_date', startDateStr)
+      .lte('transaction_date', endDateStr);
+    
+    if (error) {
+      throw error;
+    }
+    
+    // If no transactions, return default object with zeros
+    if (!transactions || transactions.length === 0) {
+      return {
+        totalIncome: 0,
+        totalExpenses: 0,
+        netSavings: 0,
+        savingRate: 0,
+        avgDailySpending: 0,
+        month: format(currentDate, 'MMMM yyyy')
+      };
+    }
+    
+    // Calculate totals
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    
+    transactions.forEach(transaction => {
+      const isIncome = transaction.categories?.is_income || 
+                      (transaction.categories === null && transaction.amount > 0);
+      
+      if (isIncome) {
+        totalIncome += Math.abs(transaction.amount);
+      } else {
+        totalExpenses += Math.abs(transaction.amount);
+      }
+    });
+    
+    // Calculate additional metrics
+    const netSavings = totalIncome - totalExpenses;
+    const savingRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
+    
+    // Calculate daily average spending
+    const daysInMonth = lastDay.getDate();
+    const daysElapsed = Math.min(currentDate.getDate(), daysInMonth);
+    const avgDailySpending = daysElapsed > 0 ? totalExpenses / daysElapsed : 0;
+    
+    return {
+      totalIncome,
+      totalExpenses,
+      netSavings,
+      savingRate,
+      avgDailySpending,
+      month: format(currentDate, 'MMMM yyyy')
+    };
+  } catch (error) {
+    console.error("Error in getMonthlySnapshot:", error);
+    // Return default values if error
+    return {
+      totalIncome: 0,
+      totalExpenses: 0,
+      netSavings: 0,
+      savingRate: 0,
+      avgDailySpending: 0,
+      month: format(new Date(), 'MMMM yyyy')
+    };
+  }
 };

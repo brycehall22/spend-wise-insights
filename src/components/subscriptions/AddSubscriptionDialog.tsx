@@ -29,9 +29,10 @@ const formSchema = z.object({
 interface AddSubscriptionDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onSave?: () => void;
 }
 
-export function AddSubscriptionDialog({ isOpen, onClose }: AddSubscriptionDialogProps) {
+export function AddSubscriptionDialog({ isOpen, onClose, onSave }: AddSubscriptionDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -42,8 +43,18 @@ export function AddSubscriptionDialog({ isOpen, onClose }: AddSubscriptionDialog
       name: "",
       amount: "",
       billing_cycle: "monthly",
+      next_payment: new Date(),
     },
   });
+
+  const resetForm = () => {
+    form.reset({
+      name: "",
+      amount: "",
+      billing_cycle: "monthly",
+      next_payment: new Date(),
+    });
+  };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
@@ -51,10 +62,10 @@ export function AddSubscriptionDialog({ isOpen, onClose }: AddSubscriptionDialog
       await subscriptionService.createSubscription({
         name: values.name,
         amount: parseFloat(values.amount),
-        billing_cycle: values.billing_cycle,
+        billing_cycle: values.billing_cycle as 'monthly' | 'yearly' | 'quarterly' | 'weekly',
         next_payment: values.next_payment.toISOString(),
         is_active: true,
-        category_id: null, // Add this line to fix the TypeScript error
+        category_id: null,
       });
       
       toast({
@@ -65,8 +76,14 @@ export function AddSubscriptionDialog({ isOpen, onClose }: AddSubscriptionDialog
       // Invalidate queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['upcomingSubscriptions'] });
       
-      form.reset();
-      onClose();
+      resetForm();
+      
+      // Call onSave callback if provided
+      if (onSave) {
+        onSave();
+      } else {
+        onClose();
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -78,8 +95,13 @@ export function AddSubscriptionDialog({ isOpen, onClose }: AddSubscriptionDialog
     }
   }
 
+  const handleOnClose = () => {
+    resetForm();
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleOnClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Subscription</DialogTitle>
@@ -133,9 +155,10 @@ export function AddSubscriptionDialog({ isOpen, onClose }: AddSubscriptionDialog
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
                       <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
                       <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -183,7 +206,7 @@ export function AddSubscriptionDialog({ isOpen, onClose }: AddSubscriptionDialog
             />
             
             <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={handleOnClose}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>

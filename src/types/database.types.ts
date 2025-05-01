@@ -1,4 +1,3 @@
-
 export type DbAccount = {
   account_id: string;
   user_id: string;
@@ -84,7 +83,6 @@ export type DbBudget = {
   category_id?: string | null;
   amount: number;
   month: string;
-  notes?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -111,6 +109,24 @@ export type DbSavingsGoal = {
 export type SavingsGoal = DbSavingsGoal & {
   category_name?: string;
   progress_percentage?: number;
+};
+
+// New Subscription types
+export type DbSubscription = {
+  subscription_id: string;
+  user_id: string;
+  name: string;
+  amount: number;
+  billing_cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  next_payment: string;
+  is_active: boolean;
+  category_id?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Subscription = DbSubscription & {
+  category_name?: string;
 };
 
 // Transaction filter types

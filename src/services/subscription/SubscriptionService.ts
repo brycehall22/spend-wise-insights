@@ -1,90 +1,205 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { BaseService } from "@/services/BaseService";
+import { addMonths, addWeeks, addYears } from "date-fns";
 
 export interface Subscription {
   subscription_id: string;
   user_id: string;
   name: string;
   amount: number;
+  billing_cycle: 'monthly' | 'yearly' | 'quarterly' | 'weekly';
   next_payment: string;
-  category_id: string | null;
-  billing_cycle: string;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  category_id: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
-class SubscriptionService extends BaseService {
-  // Get upcoming subscriptions
-  async getUpcomingSubscriptions(): Promise<Subscription[]> {
-    return this.withAuth(async (userId) => {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select(`
-          *,
-          categories (name)
-        `)
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .gte('next_payment', new Date().toISOString())
-        .order('next_payment', { ascending: true })
-        .limit(5);
+export type CreateSubscriptionData = Omit<Subscription, 'subscription_id' | 'user_id' | 'created_at' | 'updated_at'>;
 
-      if (error) throw error;
-      return data || [];
-    });
+class SubscriptionService {
+  async getSubscriptions(): Promise<Subscription[]> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    
+    if (!userId) {
+      throw new Error('User must be logged in to fetch subscriptions');
+    }
+    
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select(`
+        *,
+        categories (name)
+      `)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('next_payment', { ascending: true });
+    
+    if (error) {
+      throw error;
+    }
+    
+    return (data || []).map(sub => ({
+      ...sub,
+      billing_cycle: sub.billing_cycle as 'monthly' | 'yearly' | 'quarterly' | 'weekly'
+    }));
   }
-
-  // Create a new subscription
-  async createSubscription(subscription: Omit<Subscription, 'subscription_id' | 'user_id' | 'created_at' | 'updated_at' | 'category_id'> & { category_id?: string | null }): Promise<Subscription> {
-    return this.withAuth(async (userId) => {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .insert([{ ...subscription, user_id: userId }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    });
+  
+  async getUpcomingSubscriptions(limit: number = 5): Promise<Subscription[]> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    
+    if (!userId) {
+      throw new Error('User must be logged in to fetch subscriptions');
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    const oneMonthLater = new Date();
+    oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+    const oneMonthLaterStr = oneMonthLater.toISOString().split('T')[0];
+    
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select(`
+        *,
+        categories (name)
+      `)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .gte('next_payment', today)
+      .lte('next_payment', oneMonthLaterStr)
+      .order('next_payment', { ascending: true })
+      .limit(limit);
+    
+    if (error) {
+      throw error;
+    }
+    
+    return (data || []).map(sub => ({
+      ...sub,
+      billing_cycle: sub.billing_cycle as 'monthly' | 'yearly' | 'quarterly' | 'weekly'
+    }));
   }
-
-  // Create subscription from transaction
-  async createFromTransaction(transactionId: string): Promise<Subscription | null> {
-    return this.withAuth(async (userId) => {
-      // Get the transaction details
-      const { data: transaction, error: transactionError } = await supabase
-        .from('transactions')
-        .select(`
-          *,
-          categories (name)
-        `)
-        .eq('transaction_id', transactionId)
-        .single();
-
-      if (transactionError) throw transactionError;
-      if (!transaction) return null;
-
-      // Check if the category is "Subscriptions"
-      const isSubscription = transaction.categories?.name === 'Subscriptions';
-      if (!isSubscription) return null;
-
-      // Create a new subscription
-      const nextPaymentDate = new Date(transaction.transaction_date);
-      nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1); // Default to monthly
-
-      const subscription = {
-        name: transaction.description || transaction.merchant,
-        amount: Math.abs(transaction.amount),
+  
+  async createSubscription(subscription: CreateSubscriptionData): Promise<Subscription> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    
+    if (!userId) {
+      throw new Error('User must be logged in to create a subscription');
+    }
+    
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .insert({
+        ...subscription,
+        user_id: userId
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    return {
+      ...data,
+      billing_cycle: data.billing_cycle as 'monthly' | 'yearly' | 'quarterly' | 'weekly'
+    };
+  }
+  
+  async updateSubscription(subscriptionId: string, updates: Partial<Subscription>): Promise<Subscription> {
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .update(updates)
+      .eq('subscription_id', subscriptionId)
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    return {
+      ...data,
+      billing_cycle: data.billing_cycle as 'monthly' | 'yearly' | 'quarterly' | 'weekly'
+    };
+  }
+  
+  async deleteSubscription(subscriptionId: string): Promise<void> {
+    const { error } = await supabase
+      .from('subscriptions')
+      .delete()
+      .eq('subscription_id', subscriptionId);
+    
+    if (error) {
+      throw error;
+    }
+  }
+  
+  async processPayment(subscriptionId: string): Promise<void> {
+    // Get the subscription
+    const { data: subscription, error: fetchError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('subscription_id', subscriptionId)
+      .single();
+    
+    if (fetchError || !subscription) {
+      throw fetchError || new Error('Subscription not found');
+    }
+    
+    // Calculate next payment date based on billing cycle
+    const currentPaymentDate = new Date(subscription.next_payment);
+    let nextPaymentDate: Date;
+    
+    switch (subscription.billing_cycle) {
+      case 'weekly':
+        nextPaymentDate = addWeeks(currentPaymentDate, 1);
+        break;
+      case 'monthly':
+        nextPaymentDate = addMonths(currentPaymentDate, 1);
+        break;
+      case 'quarterly':
+        nextPaymentDate = addMonths(currentPaymentDate, 3);
+        break;
+      case 'yearly':
+        nextPaymentDate = addYears(currentPaymentDate, 1);
+        break;
+      default:
+        nextPaymentDate = addMonths(currentPaymentDate, 1); // Default to monthly
+    }
+    
+    // Update the subscription with the new next_payment date
+    const { error: updateError } = await supabase
+      .from('subscriptions')
+      .update({
         next_payment: nextPaymentDate.toISOString(),
-        category_id: transaction.category_id,
-        billing_cycle: 'monthly',
-        is_active: true
-      };
-
-      return this.createSubscription(subscription);
-    });
+      })
+      .eq('subscription_id', subscriptionId);
+    
+    if (updateError) {
+      throw updateError;
+    }
+    
+    // Create a transaction for this payment
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: subscription.user_id,
+        amount: -Math.abs(subscription.amount),
+        description: `${subscription.name} subscription payment`,
+        merchant: subscription.name,
+        category_id: subscription.category_id,
+        transaction_date: currentPaymentDate.toISOString().split('T')[0],
+        status: 'cleared',
+        currency: 'USD',
+      } as any);
+    
+    if (transactionError) {
+      throw transactionError;
+    }
   }
 }
 

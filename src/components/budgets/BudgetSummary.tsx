@@ -5,7 +5,7 @@ import { ArrowDownCircle, ArrowUpCircle, TrendingDown, TrendingUp } from "lucide
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
-import { getBudgetSummary } from "@/services/budgetService";
+import { budgetService } from "@/services/budgetService";
 import { getTransactionStats } from "@/services/transactionService";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -19,7 +19,7 @@ export default function BudgetSummary({ month }: BudgetSummaryProps) {
   // Get budget summary for the month
   const { data: budgetSummary, isLoading: loadingBudget } = useQuery({
     queryKey: ['budgetSummary', monthString],
-    queryFn: () => getBudgetSummary(monthString),
+    queryFn: () => budgetService.getBudgetSummary(monthString),
   });
 
   // Get transaction stats for the month
@@ -65,6 +65,7 @@ export default function BudgetSummary({ month }: BudgetSummaryProps) {
     );
   }
 
+  // Default values if data is not available
   const income = transactionStats?.income || 0;
   const expenses = transactionStats?.expenses || 0;
   const net = income - expenses;

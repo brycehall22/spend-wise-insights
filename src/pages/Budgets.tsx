@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import BudgetSummary from "@/components/budgets/BudgetSummary";
 import BudgetCategoryList from "@/components/budgets/BudgetCategoryList";
 import CreateBudgetDialog from "@/components/budgets/CreateBudgetDialog";
@@ -22,7 +22,7 @@ import { format, subMonths } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useQueryClient } from "@tanstack/react-query";
-import { budgetService } from "@/services/budget/BudgetService";
+import { budgetService } from "@/services/budgetService";
 
 export default function Budgets() {
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>(new Date());
@@ -118,6 +118,7 @@ export default function Budgets() {
   const invalidateQueries = () => {
     if (selectedMonth) {
       const monthKey = format(selectedMonth, 'yyyy-MM');
+      console.log("Invalidating queries for month:", monthKey);
       queryClient.invalidateQueries({ queryKey: ['budgets', monthKey] });
       queryClient.invalidateQueries({ queryKey: ['budgetSummary', monthKey] });
     }
@@ -173,12 +174,6 @@ export default function Budgets() {
         <BudgetSummary month={selectedMonth || new Date()} />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="categories">Categories</TabsTrigger>
-            <TabsTrigger value="income">Income</TabsTrigger>
-          </TabsList>
-          
           <TabsContent value="overview" className="mt-0">
             <Card className="p-6">
               <BudgetCategoryList 

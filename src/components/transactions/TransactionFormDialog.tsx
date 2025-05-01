@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,7 +25,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { TransactionType } from "./TransactionTable"; 
+import { Textarea } from "@/components/ui/textarea";
+import { updateTransaction } from "@/services/transaction/transactionCore";
+import { useQueryClient } from "@tanstack/react-query";
+
+// Define types for the transaction
+export type TransactionType = {
+  transaction_id: string;
+  account_id: string;
+  account_name?: string;
+  category_id: string | null;
+  category_name?: string | null;
+  amount: number;
+  currency: string;
+  transaction_date: string;
+  description: string;
+  merchant: string;
+  status: 'cleared' | 'pending';
+  is_flagged?: boolean;
+};
 
 // Define types for form values
 export type TransactionFormValues = {
@@ -38,15 +55,16 @@ export type TransactionFormValues = {
   description: string;
   merchant: string;
   status: "cleared" | "pending";
+  notes?: string;
 };
 
 // Define props for dialog
 interface TransactionFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (values: TransactionFormValues) => void;
+  onSave?: (values: TransactionFormValues) => void;
   accounts: { account_id: string; account_name: string }[];
-  categories: { category_id: string; name: string }[];
+  categories: { category_id: string; name: string; is_income?: boolean }[];
   transaction?: TransactionType;
   isEdit?: boolean;
 }
@@ -68,6 +86,7 @@ const transactionSchema = z.object({
   description: z.string().min(1, "Description is required"),
   merchant: z.string().min(1, "Merchant is required"),
   status: z.enum(["cleared", "pending"]),
+  notes: z.string().optional(),
 });
 
 export default function TransactionFormDialog({
@@ -80,6 +99,7 @@ export default function TransactionFormDialog({
   isEdit = false,
 }: TransactionFormDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
 
   // Initialize form with transaction data if editing
   const form = useForm<TransactionFormValues>({
@@ -107,15 +127,40 @@ export default function TransactionFormDialog({
   });
 
   // Split categories into income and expense
-  const incomeCategories = categories.filter((cat) => cat.name.includes("Income") || cat.name === "Salary");
+  const incomeCategories = categories.filter((cat) => cat.is_income === true || cat.name.includes("Income") || cat.name === "Salary");
   const expenseCategories = categories.filter((cat) => !incomeCategories.find(ic => ic.category_id === cat.category_id));
 
   // Handle form submission
   const handleSubmit = async (values: TransactionFormValues) => {
     try {
       setIsSubmitting(true);
-      await onSave(values);
-      form.reset();
+      
+      if (isEdit && transaction) {
+        // Update the transaction in the database
+        await updateTransaction({
+          transaction_id: transaction.transaction_id,
+          account_id: values.account_id,
+          category_id: values.category_id,
+          amount: values.amount,
+          description: values.description,
+          merchant: values.merchant,
+          transaction_date: values.transaction_date.toISOString().split('T')[0],
+          status: values.status,
+        });
+        
+        // Invalidate related queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['accounts'] });
+        queryClient.invalidateQueries({ queryKey: ['transactionStats'] });
+        
+        // Call the onSave callback if provided
+        if (onSave) {
+          onSave(values);
+        }
+        
+        // Close the dialog
+        onClose();
+      }
     } catch (error) {
       console.error("Error saving transaction:", error);
     } finally {
@@ -324,6 +369,21 @@ export default function TransactionFormDialog({
                       <SelectItem value="pending">Pending</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Notes field */}
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Additional details..." {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

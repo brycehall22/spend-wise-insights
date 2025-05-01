@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   Calendar,
-  User
+  User,
+  CalendarClock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,6 +38,7 @@ export default function AppSidebar() {
     { name: "Accounts", icon: Wallet, path: "/accounts" },
     { name: "Budgets", icon: PiggyBank, path: "/budgets" },
     { name: "Goals", icon: PiggyBank, path: "/goals" },
+    { name: "Subscriptions", icon: CalendarClock, path: "/subscriptions" },
     { name: "Analytics", icon: BarChart3, path: "/analytics" },
     { name: "Calendar", icon: Calendar, path: "/calendar" },
     { name: "Settings", icon: Settings, path: "/settings" }
@@ -82,7 +84,7 @@ export default function AppSidebar() {
         <div className="flex h-full flex-col">
           <div className="flex items-center h-16 px-6 border-b">
             <Link to="/" className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-spendwise-oxford">SpendWise</span>
+              <span className="text-2xl font-bold text-spendwise-oxford">Budget App</span>
             </Link>
           </div>
           
@@ -153,7 +155,7 @@ export default function AppSidebar() {
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between h-16 px-6 border-b">
             <Link to="/" className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-spendwise-oxford">SpendWise</span>
+              <span className="text-2xl font-bold text-spendwise-oxford">Budget App</span>
             </Link>
             <button
               className="text-spendwise-oxford"

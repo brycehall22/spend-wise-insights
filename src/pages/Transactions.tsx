@@ -25,9 +25,8 @@ import {
   batchDeleteTransactions, 
   flagTransaction, 
   exportTransactions, 
-  batchUpdateCategory,
-  createTransaction
-} from '@/services/transactionService';
+  batchUpdateCategory
+} from '@/services/transaction';
 import { getCategories } from '@/services/categoryService';
 import { getAccounts } from '@/services/accountService';
 import EmptyState from '@/components/EmptyState';
@@ -81,6 +80,7 @@ export default function Transactions() {
     mutationFn: deleteTransaction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // Invalidate accounts to refresh balances
       toast({
         title: "Transaction deleted",
         description: "The transaction has been deleted successfully.",
@@ -100,6 +100,7 @@ export default function Transactions() {
     mutationFn: batchDeleteTransactions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // Invalidate accounts to refresh balances
       setSelectedItems([]);
       toast({
         title: "Transactions deleted",
@@ -192,48 +193,22 @@ export default function Transactions() {
     setIsAddDialogOpen(true);
   };
 
-  // Handle transaction added - using the same approach as in QuickAddTransaction.tsx
-  const handleTransactionAdded = async (transactionData: any) => {
-    try {
-      const { amount, description, date: transaction_date, account_id, category_id, notes, type } = transactionData;
-
-      // Adjust amount based on transaction type (negative for expense, positive for income)
-      const adjustedAmount = type === 'expense' ? -Math.abs(amount) : Math.abs(amount);
-
-      // Create the transaction in the database
-      await createTransaction({
-        account_id,
-        category_id: category_id || null,
-        amount: adjustedAmount,
-        description,
-        merchant: description, // Default to description for merchant
-        transaction_date: transaction_date.toISOString().split('T')[0],
-        currency: 'USD', // Default currency
-        status: 'cleared'
-      });
-
-      // Show success toast
-      toast({
-        title: "Transaction added",
-        description: `${type === 'expense' ? 'Expense' : 'Income'} of $${Math.abs(adjustedAmount)} added successfully`,
-      });
-
-      // Invalidate relevant queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
-      queryClient.invalidateQueries({ queryKey: ['transactionStats'] });
-      queryClient.invalidateQueries({ queryKey: ['accountBalances'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // Ensure accounts (balance) is refreshed
-      
-      setIsAddDialogOpen(false);
-    } catch (error) {
-      console.error("Error adding transaction:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to add transaction",
-        description: "An error occurred while adding the transaction. Please try again.",
-      });
-    }
+  // Handle transaction added
+  const handleTransactionAdded = (data: any) => {
+    // Invalidate queries to update UI
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['accounts'] }); // Invalidate accounts to refresh balances
+    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
+    queryClient.invalidateQueries({ queryKey: ['transactionStats'] });
+    
+    // Show success message
+    toast({
+      title: "Transaction added",
+      description: "New transaction has been added successfully.",
+    });
+    
+    // Close the dialog
+    setIsAddDialogOpen(false);
   };
 
   // Handle transaction deletion
